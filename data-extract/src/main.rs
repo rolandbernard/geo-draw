@@ -29,15 +29,15 @@ fn extract_ids(locations: &mut HashMap<String, String>, geojson: &json::JsonValu
     }
 }
 
-fn generate_fragments(fragments: &mut HashMap<String, Vec<String>>, id: String, name: &str) {
+fn generate_fragments(fragments: &mut HashMap<String, HashMap<String, bool>>, id: String, name: &str) {
     for fargment in name.split(not_alphabetic) {
         let striped = fargment.to_lowercase();
         if !striped.is_empty() {
             if !fragments.contains_key(&striped) {
                 let key = striped.clone();
-                fragments.insert(key, Vec::new());
+                fragments.insert(key, HashMap::new());
             }
-            fragments.get_mut(&striped).unwrap().push(id.clone());
+            fragments.get_mut(&striped).unwrap().insert(id.clone(), true);
         }
     }
 }
@@ -53,7 +53,7 @@ fn generate_name(locations: &HashMap<String, String>, parents: str::Split<&str>)
 
 fn generate_data(
     names: &mut HashMap<String, String>, 
-    fragments: &mut HashMap<String, Vec<String>>,
+    fragments: &mut HashMap<String, HashMap<String, bool>>,
     locations: &HashMap<String, String>, 
     geojson: &json::JsonValue
 ) {
@@ -63,11 +63,10 @@ fn generate_data(
             let name;
             if features["properties"]["id"].is_null() {
                 // Data exported from geoboundaries.org
-                let full_name = features["properties"]["shapeName"].as_str().unwrap_or("");
-                generate_fragments(fragments, id.to_string(), full_name);
                 let data_id = features["properties"]["shapeID"].as_str().unwrap_or("");
                 let parents = features["properties"]["ADMHIERACHY"].as_str().unwrap_or(&data_id).split(",");
                 name = generate_name(locations, parents);
+                generate_fragments(fragments, id.to_string(), &name);
                 names.insert(id.to_string(), name.clone());
             } else {
                 // Data exported from OpenStreetMap
@@ -79,18 +78,19 @@ fn generate_data(
                 let data_id = features["properties"]["id"].as_i32().unwrap().to_string();
                 let parents = features["properties"]["parents"].as_str().unwrap_or(&data_id).split(",");
                 name = generate_name(locations, parents);
+                generate_fragments(fragments, id.to_string(), &name);
                 names.insert(id.to_string(), name.clone());
             }
             let coordinates = &features["geometry"]["coordinates"];
             if features["geometry"]["type"] == "Polygon" {
                 fs::write(
                     format!("../static/data/{}.json", id),
-                    format!("{{\"name\":{},coordinates:[{:?}]}}", name, coordinates)
+                    format!("{{\"name\":{},\"coordinates\":[{}]}}", json::stringify(name), coordinates.to_string())
                 ).unwrap();
             } else if features["geometry"]["type"] == "MultiPolygon" {
                 fs::write(
                     format!("../static/data/{}.json", id),
-                    format!("{{\"name\":{},coordinates:{:?}}}", name, coordinates)
+                    format!("{{\"name\":{},\"coordinates\":{}}}", json::stringify(name), coordinates.to_string())
                 ).unwrap();
             }
         }
@@ -98,7 +98,7 @@ fn generate_data(
 }
 
 fn main() {
-    fs::remove_dir_all("../static/data").unwrap();
+    fs::remove_dir_all("../static/data").unwrap_or(());
     fs::create_dir("../static/data").unwrap();
     let mut data = Vec::new();
     let mut locations = HashMap::new();
@@ -120,6 +120,6 @@ fn main() {
     for json in data {
         generate_data(&mut names, &mut fragments, &locations, &json);
     }
-    fs::write("../static/data/index_names.json", format!("{:?}", names)).unwrap();
-    fs::write("../static/data/index_fragments.json", format!("{:?}", fragments)).unwrap();
+    fs::write("../static/data/index_names.json", format!("{}", json::stringify(names))).unwrap();
+    fs::write("../static/data/index_fragments.json", format!("{}", json::stringify(fragments))).unwrap();
 }
