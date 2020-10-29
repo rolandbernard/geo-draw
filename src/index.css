@@ -1,0 +1,15 @@
+
+/*
+Background dark: #373F51
+Background light: #F8F8F8
+Primary: #008DD5
+Secondary: #CE8147
+Accent: #B3001B
+*/
+
+* {
+    padding: 0;
+    margin: 0;
+    background: #F8F8F8;
+    user-select: none;
+}
