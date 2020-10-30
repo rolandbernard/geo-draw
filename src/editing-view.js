@@ -1,9 +1,20 @@
 
 import { html, LitElement } from 'lit-element'
+
+import './map-renderer';
 import Icon from './icon.svg';
 
+const data = {
+    title: "Hello world",
+    defcolor: "#ffffff",
+    locations: ["-47045", "-47046", "-47072", "-365331"],
+    columns: ["Test"],
+    colors: ["#ff0000"],
+    data: [[1], [2], [3]],
+};
+
 class EditingView extends LitElement {
-    
+
     render() {
         return html`
             <style>
@@ -30,6 +41,11 @@ class EditingView extends LitElement {
                 }
             </style>
             <header><img src="${Icon}"/><span>Geo-Draw</span></header>
+            <div>
+                <map-renderer
+                    data=${JSON.stringify(data)}
+                ></map-renderer>
+            </div>
         `;
     }
 

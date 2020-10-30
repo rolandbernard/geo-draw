@@ -30,14 +30,15 @@ export class Router {
         let run_default = true;
         this.routes.forEach(route => {
             const regEx = new RegExp(`^${route.uri}$`);
-            let path = "";
+            let path;
             if (route.uri[0] === "#") {
                 path = window.location.hash || "#/";
             } else {
                 path = window.location.pathname || "/";
             }            
-            if(path.match(regEx)){
-                let req = { path }
+            const match = path.match(regEx);
+            if(match){
+                const req = { path, match }
                 route.callback(req);
                 run_default = false;
             }
