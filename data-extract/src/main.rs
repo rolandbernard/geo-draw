@@ -1,11 +1,13 @@
 // This is used to extract geojson files in ../data/ and write the data in required format to ../static/data/
+// This program also performs simplification to the polygons.
 
 use std::fs;
+use std::fs::File;
 use std::str;
 use std::string::String;
 use std::char;
-use uuid::Uuid;
 use std::collections::HashMap;
+use std::io::prelude::*;
 
 fn not_alphabetic(c: char) -> bool {
     return !c.is_alphabetic();
@@ -29,7 +31,7 @@ fn extract_ids(locations: &mut HashMap<String, String>, geojson: &json::JsonValu
     }
 }
 
-fn generate_fragments(fragments: &mut HashMap<String, HashMap<String, bool>>, id: String, name: &str) {
+fn generate_fragments(fragments: &mut HashMap<String, HashMap<String, i32>>, id: String, name: &str) {
     for fargment in name.split(not_alphabetic) {
         let striped = fargment.to_lowercase();
         if !striped.is_empty() {
@@ -37,7 +39,7 @@ fn generate_fragments(fragments: &mut HashMap<String, HashMap<String, bool>>, id
                 let key = striped.clone();
                 fragments.insert(key, HashMap::new());
             }
-            fragments.get_mut(&striped).unwrap().insert(id.clone(), true);
+            fragments.get_mut(&striped).unwrap().insert(id.clone(), 1);
         }
     }
 }
@@ -45,53 +47,163 @@ fn generate_fragments(fragments: &mut HashMap<String, HashMap<String, bool>>, id
 fn generate_name(locations: &HashMap<String, String>, parents: str::Split<&str>) -> String {
     let mut ret = "".to_owned();
     for parent in parents {
-        ret.push_str(&locations[parent]);
-        ret.push_str(", ");
+        if locations.contains_key(parent) {
+            let parent_name = &locations[parent];
+            ret.push_str(parent_name);
+            ret.push_str(", ");
+        }
     }
     return ret.trim_matches(|c| c == ' ' || c == ',').to_owned();
 }
 
+fn write_i32(file: &mut File, value: i32) {
+    file.write_all(&[
+        (value & 0xff) as u8,
+        ((value >> 8) & 0xff) as u8,
+        ((value >> 16) & 0xff) as u8,
+        ((value >> 24) & 0xff) as u8,
+    ]).unwrap();
+}
+
+const MAX_POINTS_PER_PATH: i32 = 1024;
+const MAX_POLY_PARTS: i32 = 64;
+const MAX_POLYGONS: i32 = 256;
+
+fn cross_product(x: &(f64, f64), y: &(f64, f64)) -> f64 {
+    return (x.0 * y.0) - (x.1 * y.0);
+}
+
+fn polygon_outer_size(poly: &json::JsonValue) -> i64 {
+    let mut ret = 0.0;
+    let mut last_coords = (0.0, 0.0);
+    for coords in poly.members() {
+        let coord = (coords[0].as_f64().unwrap_or(0.0), coords[1].as_f64().unwrap_or(0.0));
+        if last_coords != (0.0, 0.0) {
+            ret += cross_product(&coord, &last_coords);
+        }
+        last_coords = coord;
+    }
+    return (f64::abs(ret) * 1_000_000_000.0) as i64;
+}
+
+fn write_poly_part(file: &mut File, part: &json::JsonValue) {
+    if part.len() as i32 <= MAX_POINTS_PER_PATH {
+        write_i32(file, part.len() as i32); // number of coordinates
+        for coords in part.members() {
+            // write coordinates as fixed point values
+            let lon = coords[0].as_f64().unwrap_or(0.0);
+            let lon_fixed = (lon * 1e7) as i32;
+            write_i32(file, lon_fixed);
+            let lat = coords[1].as_f64().unwrap_or(0.0);
+            let lat_fixed = (lat * 1e7) as i32;
+            write_i32(file, lat_fixed);
+        }
+    } else {
+        write_i32(file, MAX_POINTS_PER_PATH); // number of coordinates
+        let mut left = MAX_POINTS_PER_PATH;
+        let mut skip = 0;
+        let filtered_coords = part.members().filter(
+            |&_| {
+                skip += 1_000_000 * MAX_POINTS_PER_PATH / (part.len() as i32) + 1;
+                if skip >= 1_000_000 {
+                    left -= 1;
+                    return left >= 0;
+                } else {
+                    return false;
+                }
+            }
+        );
+        for coords in filtered_coords {
+            // write coordinates as fixed point values
+            let lon = coords[0].as_f64().unwrap_or(0.0);
+            let lon_fixed = (lon * 1e7) as i32;
+            write_i32(file, lon_fixed);
+            let lat = coords[1].as_f64().unwrap_or(0.0);
+            let lat_fixed = (lat * 1e7) as i32;
+            write_i32(file, lat_fixed);
+        }
+    }
+}
+
+fn write_polygon(file: &mut File, poly: &json::JsonValue) {
+    if poly.len() as i32 <= MAX_POLY_PARTS {
+        write_i32(file, poly.len() as i32); // number of paths
+        for part in poly.members() {
+            write_poly_part(file, part);
+        }
+    } else {
+        write_i32(file, MAX_POLY_PARTS); // number of polygons
+        write_poly_part(file, &poly[0]); // write the first part (i.e. the outline)
+        // write the biggest holes
+        let mut parts: Vec<&json::JsonValue> = poly.members().skip(1).collect();
+        parts.sort_by_key(|&x| polygon_outer_size(&x));
+        for part in parts.iter().take((MAX_POLY_PARTS - 1) as usize) {
+            write_poly_part(file, part);
+        }
+    }
+}
+
+fn write_to_file(id: &str, name: &str, geom: &json::JsonValue) {
+    let coordinates = &geom["coordinates"];
+    if geom["type"] == "Polygon" {
+        let mut file = File::create(format!("../static/data/{}.bin", id)).unwrap();
+        file.write_all(name.as_bytes()).unwrap();
+        file.write_all(&[0]).unwrap();
+        write_i32(&mut file, 1); // number of polygons
+        write_polygon(&mut file, coordinates);
+    } else if geom["type"] == "MultiPolygon" {
+        let mut file = File::create(format!("../static/data/{}.bin", id)).unwrap();
+        file.write_all(name.as_bytes()).unwrap();
+        file.write_all(&[0]).unwrap();
+        if coordinates.len() as i32 <= MAX_POLYGONS {
+            write_i32(&mut file, coordinates.len() as i32); // number of polygons
+            for poly in coordinates.members() {
+                write_polygon(&mut file, poly);
+            }
+        } else {
+            // write the polygons with the biggest outline
+            let mut polys: Vec<&json::JsonValue> = coordinates.members().collect();
+            polys.sort_by_key(|&x| polygon_outer_size(&x[0]));
+            write_i32(&mut file, MAX_POLYGONS); // number of polygons
+            for poly in polys.iter().take(MAX_POLYGONS as usize) {
+                write_polygon(&mut file, poly);
+            }
+        }
+    }
+}
+
 fn generate_data(
     names: &mut HashMap<String, String>, 
-    fragments: &mut HashMap<String, HashMap<String, bool>>,
+    fragments: &mut HashMap<String, HashMap<String, i32>>,
     locations: &HashMap<String, String>, 
     geojson: &json::JsonValue
 ) {
     if geojson["type"] == "FeatureCollection" {
         for features in geojson["features"].members() {
-            let id = Uuid::new_v4();
+            let id;
             let name;
-            if features["properties"]["id"].is_null() {
+            if !features["properties"]["shapeID"].is_null() {
                 // Data exported from geoboundaries.org
-                let data_id = features["properties"]["shapeID"].as_str().unwrap_or("");
-                let parents = features["properties"]["ADMHIERACHY"].as_str().unwrap_or(&data_id).split(",");
+                id = features["properties"]["shapeID"].as_str().unwrap_or("").to_string();
+                let parents = features["properties"]["ADMHIERACHY"].as_str().unwrap_or(&id).split(",");
                 name = generate_name(locations, parents);
                 generate_fragments(fragments, id.to_string(), &name);
                 names.insert(id.to_string(), name.clone());
-            } else {
+                write_to_file(&id, &name, &features["geomerty"]);
+            } else if !features["properties"]["id"].is_null() {
+                id = features["properties"]["id"].as_i32().unwrap().to_string();
                 // Data exported from OpenStreetMap
                 let name_props = ["name", "local_name", "name_en"];
                 for &prop in &name_props {
                     let full_name = features["properties"][prop].as_str().unwrap_or("");
                     generate_fragments(fragments, id.to_string(), full_name);
                 }
-                let data_id = features["properties"]["id"].as_i32().unwrap().to_string();
-                let parents = features["properties"]["parents"].as_str().unwrap_or(&data_id).split(",");
-                name = generate_name(locations, parents);
+                let parents = format!("{},{}", id, features["properties"]["parents"].as_str().unwrap_or(""));
+                let split_parents = parents.split(",");
+                name = generate_name(locations, split_parents);
                 generate_fragments(fragments, id.to_string(), &name);
                 names.insert(id.to_string(), name.clone());
-            }
-            let coordinates = &features["geometry"]["coordinates"];
-            if features["geometry"]["type"] == "Polygon" {
-                fs::write(
-                    format!("../static/data/{}.json", id),
-                    format!("{{\"name\":{},\"coordinates\":[{}]}}", json::stringify(name), coordinates.to_string())
-                ).unwrap();
-            } else if features["geometry"]["type"] == "MultiPolygon" {
-                fs::write(
-                    format!("../static/data/{}.json", id),
-                    format!("{{\"name\":{},\"coordinates\":{}}}", json::stringify(name), coordinates.to_string())
-                ).unwrap();
+                write_to_file(&id, &name, &features["geometry"]);
             }
         }
     }
