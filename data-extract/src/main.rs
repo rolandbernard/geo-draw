@@ -151,7 +151,7 @@ fn write_polygon(file: &mut File, poly: &json::JsonValue) {
         write_poly_part(file, &poly[0]); // write the first part (i.e. the outline)
         // write the biggest holes
         let mut parts: Vec<&json::JsonValue> = poly.members().skip(1).collect();
-        parts.sort_by_key(|&x| polygon_outer_size(&x));
+        parts.sort_by_key(|&x| -polygon_outer_size(&x));
         for part in parts.iter().take((MAX_POLY_PARTS - 1) as usize) {
             write_poly_part(file, part);
         }
@@ -178,7 +178,7 @@ fn write_to_file(id: &str, name: &str, geom: &json::JsonValue) {
         } else {
             // write the polygons with the biggest outline
             let mut polys: Vec<&json::JsonValue> = coordinates.members().collect();
-            polys.sort_by_key(|&x| polygon_outer_size(&x[0]));
+            polys.sort_by_key(|&x| -polygon_outer_size(&x[0]));
             write_i32(&mut file, MAX_POLYGONS); // number of polygons
             for poly in polys.iter().take(MAX_POLYGONS as usize) {
                 write_polygon(&mut file, poly);
