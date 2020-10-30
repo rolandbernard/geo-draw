@@ -208,11 +208,6 @@ fn generate_data(
             } else if !features["properties"]["id"].is_null() {
                 id = features["properties"]["id"].as_i32().unwrap().to_string();
                 // Data exported from OpenStreetMap
-                let name_props = ["name", "local_name", "name_en"];
-                for &prop in &name_props {
-                    let full_name = features["properties"][prop].as_str().unwrap_or("");
-                    generate_fragments(fragments, id.to_string(), full_name);
-                }
                 let parents = format!("{},{}", id, features["properties"]["parents"].as_str().unwrap_or(""));
                 let split_parents = parents.split(",");
                 name = generate_name(locations, split_parents.clone(), false);
