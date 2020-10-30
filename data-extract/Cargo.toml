@@ -6,4 +6,3 @@ edition = "2018"
 
 [dependencies]
 json = "0.12.4"
-uuid = { version = "0.4", features = ["serde", "v4"] }
