@@ -113,20 +113,21 @@ fn write_poly_part(file: &mut File, part: &json::JsonValue) {
             write_i32(file, lat_fixed);
         }
     } else {
-        write_i32(file, MAX_POINTS_PER_PATH); // number of coordinates
         let mut left = MAX_POINTS_PER_PATH;
-        let mut skip = 0;
-        let filtered_coords = part.members().filter(
+        let mut skip: f64 = 0.0;
+        let filtered_coords: Vec<&json::JsonValue> = part.members().filter(
             |&_| {
-                skip += 1_000_000 * MAX_POINTS_PER_PATH / (part.len() as i32) + 1;
-                if skip >= 1_000_000 {
+                skip += MAX_POINTS_PER_PATH as f64 / (part.len() as i32) as f64;
+                if skip >= 1.0 {
+                    skip -= 1.0;
                     left -= 1;
                     return left >= 0;
                 } else {
                     return false;
                 }
             }
-        );
+        ).collect();
+        write_i32(file, filtered_coords.len() as i32); // number of coordinates
         for coords in filtered_coords {
             // write coordinates as fixed point values
             let lon = coords[0].as_f64().unwrap_or(0.0);
