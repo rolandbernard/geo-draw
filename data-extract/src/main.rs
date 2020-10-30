@@ -13,19 +13,28 @@ fn not_alphabetic(c: char) -> bool {
     return !c.is_alphabetic();
 }
 
-fn extract_ids(locations: &mut HashMap<String, String>, geojson: &json::JsonValue) {
+fn extract_ids(locations: &mut HashMap<String, (String, String)>, geojson: &json::JsonValue) {
     if geojson["type"] == "FeatureCollection" {
         for features in geojson["features"].members() {
             if features["properties"]["id"].is_null() {
                 // Data exported from geoboundaries.org
                 let id = features["properties"]["shapeID"].as_str().unwrap_or("");
                 let name = features["properties"]["shapeName"].as_str().unwrap_or("");
-                locations.insert(id.to_string(), name.to_string());
+                locations.insert(id.to_string(), (name.to_string(), name.to_string()));
             } else {
                 // Data exported from OpenStreetMap
                 let id = features["properties"]["id"].as_i32().unwrap();
+                let mut frag_name = "".to_owned();
+                let name_props = ["name", "local_name", "name_en"];
+                for &prop in &name_props {
+                    let full_name = features["properties"][prop].as_str().unwrap_or("");
+                    if !full_name.is_empty() {
+                        frag_name.push_str(full_name);
+                        frag_name.push_str(" ");
+                    }
+                }
                 let name = features["properties"]["name"].as_str().unwrap_or("");
-                locations.insert(id.to_string(), name.to_string());
+                locations.insert(id.to_string(), (name.to_string(), frag_name));
             }
         }
     }
@@ -44,13 +53,18 @@ fn generate_fragments(fragments: &mut HashMap<String, HashMap<String, i32>>, id:
     }
 }
 
-fn generate_name(locations: &HashMap<String, String>, parents: str::Split<&str>) -> String {
+fn generate_name(locations: &HashMap<String, (String, String)>, parents: str::Split<&str>, frag: bool) -> String {
     let mut ret = "".to_owned();
     for parent in parents {
         if locations.contains_key(parent) {
             let parent_name = &locations[parent];
-            ret.push_str(parent_name);
-            ret.push_str(", ");
+            if frag {
+                ret.push_str(&parent_name.1);
+                ret.push_str(" ");
+            } else {
+                ret.push_str(&parent_name.0);
+                ret.push_str(", ");
+            }
         }
     }
     return ret.trim_matches(|c| c == ' ' || c == ',').to_owned();
@@ -175,7 +189,7 @@ fn write_to_file(id: &str, name: &str, geom: &json::JsonValue) {
 fn generate_data(
     names: &mut HashMap<String, String>, 
     fragments: &mut HashMap<String, HashMap<String, i32>>,
-    locations: &HashMap<String, String>, 
+    locations: &HashMap<String, (String, String)>, 
     geojson: &json::JsonValue
 ) {
     if geojson["type"] == "FeatureCollection" {
@@ -186,8 +200,9 @@ fn generate_data(
                 // Data exported from geoboundaries.org
                 id = features["properties"]["shapeID"].as_str().unwrap_or("").to_string();
                 let parents = features["properties"]["ADMHIERACHY"].as_str().unwrap_or(&id).split(",");
-                name = generate_name(locations, parents);
-                generate_fragments(fragments, id.to_string(), &name);
+                name = generate_name(locations, parents.clone(), false);
+                let frag_name = generate_name(locations, parents, true);
+                generate_fragments(fragments, id.to_string(), &frag_name);
                 names.insert(id.to_string(), name.clone());
                 write_to_file(&id, &name, &features["geomerty"]);
             } else if !features["properties"]["id"].is_null() {
@@ -200,8 +215,9 @@ fn generate_data(
                 }
                 let parents = format!("{},{}", id, features["properties"]["parents"].as_str().unwrap_or(""));
                 let split_parents = parents.split(",");
-                name = generate_name(locations, split_parents);
-                generate_fragments(fragments, id.to_string(), &name);
+                name = generate_name(locations, split_parents.clone(), false);
+                let frag_name = generate_name(locations, split_parents, true);
+                generate_fragments(fragments, id.to_string(), &frag_name);
                 names.insert(id.to_string(), name.clone());
                 write_to_file(&id, &name, &features["geometry"]);
             }
