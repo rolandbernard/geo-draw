@@ -36,11 +36,15 @@ class MapRenderer extends LitElement {
                 position: relative;
             }
             div#info-box-wrapper {
+                --anchor-point: 50%;
+                --anchor-at-bottom: 0;
                 position: absolute;
                 top: 0;
                 left: 0;
                 z-index: 100;
-                transform: translate(-50%, calc(-100% - 8.5px));
+                transform: translate(
+                    calc(var(--anchor-point) * -1),
+                    calc(var(--anchor-at-bottom) * (-100% - 8.5px) + (1 - var(--anchor-at-bottom)) * 8.5px));
                 display: none;
                 pointer-events: none;
             }
@@ -86,10 +90,9 @@ class MapRenderer extends LitElement {
                 position: absolute;
                 width: 12px;
                 height: 12px;
-                bottom: 0;
-                left: 0;
-                margin-left: 50%;
-                transform: translate(-50%, 50%) rotate(45deg);
+                top: calc(var(--anchor-at-bottom) * 100%);
+                left: var(--anchor-point);
+                transform: translate(-50%, -50%) rotate(45deg);
                 background: var(--background-light);
             }
             div.info-field {
@@ -186,8 +189,12 @@ class MapRenderer extends LitElement {
                 const name = this.shadowRoot.getElementById('info-box-name');
                 const map_wrapper = this.shadowRoot.getElementById('map-wrapper');
                 const elem_pos = elem.getBoundingClientRect();
-                info_box.style.top = (elem_pos.y - map_wrapper.offsetTop + elem_pos.height / 2) + 'px';
-                info_box.style.left = (elem_pos.x - map_wrapper.offsetLeft + elem_pos.width / 2) + 'px';
+                const x = elem_pos.x - map_wrapper.offsetLeft + elem_pos.width / 2;
+                const y = elem_pos.y - map_wrapper.offsetTop + elem_pos.height / 2;
+                info_box.style.left = x + 'px';
+                info_box.style.top = y + 'px';
+                info_box.style.setProperty('--anchor-point', (x / map_wrapper.clientWidth * 90 + 5) + '%');
+                info_box.style.setProperty('--anchor-at-bottom', (y > info_box.clientHeight) ? 1 : 0);
                 name.innerText = location.name.split(',')[0];
                 Array.from(info_box.getElementsByClassName('info-field-value')).forEach((el, i) => {
                     el.innerText = Math.round(location.data[i] * 100) / 100;
