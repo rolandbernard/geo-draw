@@ -3,6 +3,8 @@ import { LitElement, html, svg, css } from 'lit-element';
 import { styleMap } from 'lit-html/directives/style-map';
 import { until } from 'lit-html/directives/until';
 
+const location_cache = {};
+
 class MapRenderer extends LitElement {
 
     static get properties() {
@@ -13,24 +15,44 @@ class MapRenderer extends LitElement {
     
     static get styles() {
         return css`
+            * {
+                box-sizing: border-box;
+            }
+            :host {
+                width: 100%;
+                height: 100%;
+                display: block;
+            }
             div#map-renderer-root {
                 width: 100%;
                 height: 100%;
                 overflow: visible;
-                display: flex;
-                align-items: center;
-                justify-content: center;
+                display: block;
+                position: relative;
+                color: white;
+                padding: 1rem;
+                --background: var(--background-dark);
+                background: var(--background);
             }
             svg.wrapping-svg {
-                stroke: var(--background-light);
+                stroke: var(--background);
                 stroke-width: 0.25%;
                 stroke-linejoin: round;
                 stroke-linecap: round;
                 filter: url(#dropshadow);
+                width: 100%;
+                height: 100%;
+                max-width: 100%;
+                max-height: 100%;
+                display: block;
             }
             div#map-wrapper {
                 position: relative;
-                flex: 1 1 auto;
+                width: 100%;
+                height: 100%;
+                max-width: 100%;
+                max-height: 100%;
+                display: block;
             }
             div#info-box-wrapper {
                 --anchor-point: 50%;
@@ -52,6 +74,7 @@ class MapRenderer extends LitElement {
                 padding: 0.5rem;
                 font-size: 0.9rem;
                 font-family: Roboto, sans-serif;
+                color: black;
                 display: block;
                 width: max-content;
                 height: max-content;
@@ -113,15 +136,18 @@ class MapRenderer extends LitElement {
             hr {
                 border: 1px solid var(--secondary);
             }
-            span.title {
+            div.title {
                 flex: 0 0 auto;
                 font-size: 1.2rem;
                 padding: 1rem 0 0 1rem;
                 font-family: Roboto, sans-serif;
                 position: absolute;
                 z-index: 10;
+                left: 0;
+                top: 0;
             }
             div#map-legend {
+                z-index: 9;
                 position: absolute;
                 padding: 0 1rem 1rem 0;
                 bottom: 0;
@@ -244,8 +270,9 @@ class MapRenderer extends LitElement {
                 const name = this.shadowRoot.getElementById('info-box-name');
                 const map_wrapper = this.shadowRoot.getElementById('map-wrapper');
                 const elem_pos = elem.getBoundingClientRect();
-                const x = elem_pos.x - map_wrapper.offsetLeft + elem_pos.width / 2;
-                const y = elem_pos.y - map_wrapper.offsetTop + elem_pos.height / 2;
+                const map_wrapper_pos = map_wrapper.getBoundingClientRect();
+                const x = elem_pos.x - map_wrapper_pos.x + elem_pos.width / 2;
+                const y = elem_pos.y - map_wrapper_pos.y + elem_pos.height / 2;
                 info_box.style.left = x + 'px';
                 info_box.style.top = y + 'px';
                 info_box.style.setProperty('--anchor-point', (x / map_wrapper.clientWidth * 90 + 5) + '%');
@@ -267,18 +294,18 @@ class MapRenderer extends LitElement {
         const data = this.data;
         if(data?.locations) {
             const locations_promise = Promise.all(data.locations.map(async location => {
-                const res = await fetch(`/static/data/${location}.bin`);
-                const data = MapRenderer.parseBinaryData(await res.arrayBuffer());
-                data.coords = data.coords.map(poly => poly.map(part => (
-                    part.map(([lon, lat]) => MapRenderer.project([lon / 1e7, lat / 1e7]).map(el => 1000 * el))
-                )));
-                return {
-                    name: data.name,
-                    min: data.coords.flat(2).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
-                    max: data.coords.flat(2).reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
-                    svg: data.coords.map(poly => (
-                        svg`<path d="${
-                            poly.map((part, i) => (
+                if (!location_cache[location]) {
+                    const res = await fetch(`/static/data/${location}.bin`);
+                    const data = MapRenderer.parseBinaryData(await res.arrayBuffer());
+                    data.coords = data.coords.map(poly => poly.map(part => (
+                        part.map(([lon, lat]) => MapRenderer.project([lon / 1e7, lat / 1e7]).map(el => 1000 * el))
+                    )));
+                    location_cache[location] = {
+                        name: data.name,
+                        min: data.coords.flat(2).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
+                        max: data.coords.flat(2).reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
+                        svg: data.coords.map(poly => (
+                            svg`<path d="${poly.map((part, i) => (
                                 (i == 0 ? part : part.reverse())
                                     .map((coord, i) => (
                                         i == 0
@@ -286,9 +313,11 @@ class MapRenderer extends LitElement {
                                             : 'L ' + coord[0] + ',' + coord[1]
                                     )).join(' ') + ' z'
                             )).join(' ')
-                        }"/>`
-                    )),
-                };
+                                }"/>`
+                        )),
+                    };
+                }
+                return location_cache[location];
             }));
             const color_data = data.data.map(row => data.color_using ? data.color_using.map(el => row[el]) : row);
             const defcolor = MapRenderer.parseColor(data.defcolor || "#ffffff");
@@ -330,7 +359,6 @@ class MapRenderer extends LitElement {
                             </div>
                         </div>
                     </div>
-                    <span class="title">${data.title}</span>
                     <svg
                         class="wrapping-svg"
                         xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
@@ -358,26 +386,27 @@ class MapRenderer extends LitElement {
                             </g>
                         `))}
                     </svg>
-                    <div id="map-legend">${
-                        color_data?.[0]?.length > 1
-                            ? (data.colors.map((col, i) => (html`
-                                <span class="legend-label">${data.color_using ? data.columns[data.color_using[i]] : data.color_using[i]}</span>
-                                <span class="color-block" style="${styleMap({
-                                    background: data.colors[i],
-                                })}"></span>
-                            ` )))
-                            : (html`
-                                <span class="legend-label">${data.color_using ? data.columns[data.color_using[0]] : data.color_using[0]}</span>
-                                <span class="color-gradiant">
-                                    <span>${Math.round(data_max[0] * 100) / 100}</span>
-                                    <span class="scale" style="${styleMap({
-                                        background: `linear-gradient(${data.colors[0]},${data.defcolor})`,
-                                    })}"></span>
-                                    <span>${data_min[0]}</span>
-                                </span>
-                            `)
-                    }</div>
                 </div>
+                <div class="title">${data.title}</div>
+                <div id="map-legend">${
+                    color_data?.[0]?.length > 1
+                        ? (data.colors.map((col, i) => (html`
+                            <span class="legend-label">${data.color_using ? data.columns[data.color_using[i]] : data.color_using[i]}</span>
+                            <span class="color-block" style="${styleMap({
+                                background: data.colors[i],
+                            })}"></span>
+                        ` )))
+                        : (html`
+                            <span class="legend-label">${data.color_using ? data.columns[data.color_using[0]] : data.color_using[0]}</span>
+                            <span class="color-gradiant">
+                                <span>${Math.round(data_max[0] * 100) / 100}</span>
+                                <span class="scale" style="${styleMap({
+                                    background: `linear-gradient(${data.colors[0]},${data.defcolor})`,
+                                })}"></span>
+                                <span>${data_min[0]}</span>
+                            </span>
+                        `)
+                }</div>
             `;
         } else {
             return html`<div class="no-data">No data</div>`

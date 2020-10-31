@@ -72,22 +72,51 @@ class EditingView extends LitElement {
                 gap: 0.5rem;
                 height: 2.75rem;
                 box-shadow: var(--shadow-large);
+                flex: 0 0 auto;
             }
             header img {
                 width: 2rem;
                 height: 2rem;
                 pointer-events: none;
             }
+            div.editing-view-root {
+                height: 100%;
+                width: 100%;
+                display: flex;
+                flex-flow: column;
+            }
+            div.content-root {
+                display: flex;
+                flex-flow: column;
+                flex: 1 1 100%;
+            }
+            div.editing, div.renderer {
+                flex: 1 1 50%;
+                min-height: 50%;
+                min-width: 50%;
+            }
+            :host {
+                height: 100%;
+                width: 100%;
+                display: block;
+            }
         `;
     }
 
     render() {
         return html`
-            <header><img src="${Icon}"/><span>Geo-Draw</span></header>
-            <div>
-                <map-renderer
-                    .data="${data}"
-                ></map-renderer>
+            <div class="editing-view-root">
+                <header><img src="${Icon}"/><span>Geo-Draw</span></header>
+                <div class="content-root">
+                    <div class="editing">
+
+                    </div>
+                    <div class="renderer">
+                        <map-renderer
+                            .data="${data}"
+                        ></map-renderer>
+                    </div>
+                </div>
             </div>
         `;
     }
