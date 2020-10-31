@@ -69,7 +69,7 @@ class MapRenderer extends LitElement {
                 width: 100%;
                 height: 100%;
                 border-radius: 4px;
-                opacity: 0.7;
+                opacity: 0.85;
                 z-index: -1;
             }
             div#info-box-background::before {
@@ -109,6 +109,46 @@ class MapRenderer extends LitElement {
                 overflow: hidden;
                 text-overflow: ellipsis;
                 white-space: nowrap;
+            }
+            hr {
+                border: 1px solid var(--secondary);
+            }
+            span.title {
+                flex: 0 0 auto;
+                font-size: 1.2rem;
+                padding: 1rem 0 0 1rem;
+                font-family: Roboto, sans-serif;
+                position: absolute;
+                z-index: 10;
+            }
+            div#map-legend {
+                position: absolute;
+                padding: 0 1rem 1rem 0;
+                bottom: 0;
+                right: 0;
+                font-size: 0.75rem;
+                font-family: Roboto, sans-serif;
+                display: grid;
+                grid-template-columns: auto auto;
+                grid-gap: 0.5rem;
+                align-items: center;
+            }
+            span.color-gradiant {
+                display: flex;
+                flex-flow: column;
+                align-items: center;
+            }
+            span.color-gradiant span.scale {
+                display: block;
+                height: 5rem;
+                width: 0.5rem;
+                box-shadow: var(--shadow-small);
+            }
+            span.color-block {
+                display: block;
+                height: 0.5rem;
+                width: 0.5rem;
+                box-shadow: var(--shadow-small);
             }
         `;
     }
@@ -174,8 +214,13 @@ class MapRenderer extends LitElement {
 
     static blendColors(colors, proportion) {
         const ret = [0, 0, 0];
-        colors.forEach((col, i) => ret.forEach((el, j) => ret[j] += col[j]*col[j]*proportion[i]));
-        return ret.map(el => Math.sqrt(el));
+        const sum = proportion.reduce((a, b) => a + b, 0);
+        if (sum === 0) {
+            return ret;
+        } else {
+            colors.forEach((col, i) => ret.forEach((el, j) => ret[j] += col[j]*col[j]*proportion[i]));
+            return ret.map(el => Math.sqrt(el / sum));
+        }
     }
 
     static colorPropScale(prop) {
@@ -245,10 +290,10 @@ class MapRenderer extends LitElement {
                     )),
                 };
             }));
-            const color_data = data.data.map(row => row.filter((_, i) => data.color_using ? data.color_using.find(el => el === i) : true));
+            const color_data = data.data.map(row => data.color_using ? data.color_using.map(el => row[el]) : row);
             const defcolor = MapRenderer.parseColor(data.defcolor || "#ffffff");
             let colors;
-            if(color_data?.[0].length > 0) {
+            if(color_data?.[0]?.length > 0) {
                 const max_data = color_data.reduce((a, b) => a.map((el, i) => Math.max(el, b[i])));
                 colors = color_data.map(data_vec => {
                     if(data_vec.length == 1) {
@@ -258,7 +303,7 @@ class MapRenderer extends LitElement {
                     } else {
                         const sum = data_vec.reduce((a, b) => a + b);
                         const colors = data.colors.map(col => MapRenderer.parseColor(col));
-                        const prop = data_vec.map(el => el / sum);
+                        const prop = data_vec.map(el => (el / sum));
                         return MapRenderer.blendColors(colors, prop);
                     }
                 });
@@ -268,6 +313,8 @@ class MapRenderer extends LitElement {
             const locations = (await locations_promise).map((loc, i) => ({...loc, data: data.data[i], columns: data.columns}));
             const min = locations.map(loc => loc.min).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]);
             const max = locations.map(loc => loc.max).reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]);
+            const data_min = color_data.reduce((a, b) => a.map((el, i) => Math.min(el, b[i])));
+            const data_max = color_data.reduce((a, b) => a.map((el, i) => Math.max(el, b[i])));
             return html`
                 <div id="map-wrapper">
                     <div id="info-box-wrapper">
@@ -283,6 +330,7 @@ class MapRenderer extends LitElement {
                             </div>
                         </div>
                     </div>
+                    <span class="title">${data.title}</span>
                     <svg
                         class="wrapping-svg"
                         xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
@@ -310,6 +358,25 @@ class MapRenderer extends LitElement {
                             </g>
                         `))}
                     </svg>
+                    <div id="map-legend">${
+                        color_data?.[0]?.length > 1
+                            ? (data.colors.map((col, i) => (html`
+                                <span class="legend-label">${data.color_using ? data.columns[data.color_using[i]] : data.color_using[i]}</span>
+                                <span class="color-block" style="${styleMap({
+                                    background: data.colors[i],
+                                })}"></span>
+                            ` )))
+                            : (html`
+                                <span class="legend-label">${data.color_using ? data.columns[data.color_using[0]] : data.color_using[0]}</span>
+                                <span class="color-gradiant">
+                                    <span>${Math.round(data_max[0] * 100) / 100}</span>
+                                    <span class="scale" style="${styleMap({
+                                        background: `linear-gradient(${data.colors[0]},${data.defcolor})`,
+                                    })}"></span>
+                                    <span>${data_min[0]}</span>
+                                </span>
+                            `)
+                    }</div>
                 </div>
             `;
         } else {
