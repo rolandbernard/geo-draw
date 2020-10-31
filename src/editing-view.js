@@ -1,7 +1,6 @@
 
 import { css, html, LitElement } from 'lit-element'
 
-import './map-renderer';
 import Icon from './icon.svg';
 
 const data = {
@@ -87,7 +86,7 @@ class EditingView extends LitElement {
             <header><img src="${Icon}"/><span>Geo-Draw</span></header>
             <div>
                 <map-renderer
-                    .data=${data}
+                    .data="${data}"
                 ></map-renderer>
             </div>
         `;

@@ -3,7 +3,7 @@
     "version": "0.1.0",
     "description": "A simple way to create map visualizations",
     "scripts": {
-        "dist": "webpack",
+        "dist": "webpack -p",
         "dev": "webpack-dev-server -d"
     },
     "author": "Roland Bernard",

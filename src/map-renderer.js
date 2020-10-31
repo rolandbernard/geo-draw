@@ -14,26 +14,23 @@ class MapRenderer extends LitElement {
     static get styles() {
         return css`
             div#map-renderer-root {
-                display: flex;
-                align-items: center;
-                justify-content: center;
                 width: 100%;
                 height: 100%;
                 overflow: visible;
+                display: flex;
+                align-items: center;
+                justify-content: center;
             }
             svg.wrapping-svg {
                 stroke: var(--background-light);
                 stroke-width: 0.25%;
-                stroke-opacity: 0.5;
                 stroke-linejoin: round;
                 stroke-linecap: round;
                 filter: url(#dropshadow);
             }
-            g.geometry:hover {
-                filter: brightness(0.75);
-            }
             div#map-wrapper {
                 position: relative;
+                flex: 1 1 auto;
             }
             div#info-box-wrapper {
                 --anchor-point: 50%;
@@ -96,12 +93,22 @@ class MapRenderer extends LitElement {
                 background: var(--background-light);
             }
             div.info-field {
-                display: flex;
-                flex-flow: row nowrap;
+                display: grid;
+                grid-template-columns: auto auto;
             }
             span.info-field-name {
-                flex: 1 0 auto;
-                padding-right: 0.5rem;
+                padding-right: 1rem;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+            span.info-field-value {
+                display: flex;
+                align-items: center;
+                justify-content: right;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
             }
         `;
     }
@@ -144,7 +151,7 @@ class MapRenderer extends LitElement {
 
     static project([lon, lat]) {
         return [
-            (Math.PI + (lon * Math.PI / 180)) * 1000,
+            (Math.PI + (lon * Math.PI / 180)),
             (
                 Math.abs(lat) > 89.5
                     ? Math.sign(lat) * 89.5
@@ -152,7 +159,7 @@ class MapRenderer extends LitElement {
                         const phi = lat * Math.PI / 180;
                         return Math.PI - Math.log(Math.tan(Math.PI / 4 + phi / 2));
                     })()
-            ) * 1000
+            )
         ];
     }
 
@@ -178,6 +185,9 @@ class MapRenderer extends LitElement {
     mouseMoveCallback(event) {
         const x = event.clientX;
         const y = event.clientY;
+        if(!x || !y) {
+            console.log(event);
+        }
         let elem = this.shadowRoot.elementFromPoint(x, y);
         if(elem?.tagName === 'path') {
             elem = elem.parentNode;
@@ -194,7 +204,7 @@ class MapRenderer extends LitElement {
                 info_box.style.left = x + 'px';
                 info_box.style.top = y + 'px';
                 info_box.style.setProperty('--anchor-point', (x / map_wrapper.clientWidth * 90 + 5) + '%');
-                info_box.style.setProperty('--anchor-at-bottom', (y > info_box.clientHeight) ? 1 : 0);
+                info_box.style.setProperty('--anchor-at-bottom', (y > ((info_box.clientHeight + 12) * 1.2)) ? 1 : 0);
                 name.innerText = location.name.split(',')[0];
                 Array.from(info_box.getElementsByClassName('info-field-value')).forEach((el, i) => {
                     el.innerText = Math.round(location.data[i] * 100) / 100;
@@ -210,27 +220,28 @@ class MapRenderer extends LitElement {
 
     async drawMap() {
         const data = this.data;
-        console.log(data);
         if(data?.locations) {
             const locations_promise = Promise.all(data.locations.map(async location => {
                 const res = await fetch(`/static/data/${location}.bin`);
                 const data = MapRenderer.parseBinaryData(await res.arrayBuffer());
-                data.coords = data.coords.map(poly => poly.map(part => part.map(([lon, lat]) => MapRenderer.project([lon / 1e7, lat / 1e7]))));
+                data.coords = data.coords.map(poly => poly.map(part => (
+                    part.map(([lon, lat]) => MapRenderer.project([lon / 1e7, lat / 1e7]).map(el => 1000 * el))
+                )));
                 return {
                     name: data.name,
                     min: data.coords.flat(2).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
                     max: data.coords.flat(2).reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
                     svg: data.coords.map(poly => (
-                        svg`<path d=${
+                        svg`<path d="${
                             poly.map((part, i) => (
                                 (i == 0 ? part : part.reverse())
                                     .map((coord, i) => (
                                         i == 0
-                                            ? "M" + coord[0] + " " + coord[1]
-                                            : "L" + coord[0] + " " + coord[1]
-                                    )).join(' ')
+                                            ? 'M ' + coord[0] + ',' + coord[1]
+                                            : 'L ' + coord[0] + ',' + coord[1]
+                                    )).join(' ') + ' z'
                             )).join(' ')
-                        }/>`
+                        }"/>`
                     )),
                 };
             }));
@@ -264,20 +275,21 @@ class MapRenderer extends LitElement {
                         <div id="info-box">
                             <div id="info-box-name"></div>
                             <hr />
-                            ${data.columns.map(col => (html`
-                                <div class="info-field">
+                            <div class="info-field">
+                                ${data.columns.map(col => (html`
                                     <span class="info-field-name">${col}</span>
                                     <span class="info-field-value"></span>
-                                </div>
-                            `))}
+                                `))}
+                            </div>
                         </div>
                     </div>
                     <svg
                         class="wrapping-svg"
                         xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
-                        viewBox=${min[0] + " " + min[1] + " " + (max[0] - min[0]) + " " + (max[1] - min[1])}
-                        @mousemove=${this.mouseMoveCallback}
-                        @mouseout=${this.mouseMoveCallback}
+                        viewBox="${min[0] + " " + min[1] + " " + (max[0] - min[0]) + " " + (max[1] - min[1])}"
+                        @mousemove="${this.mouseMoveCallback}"
+                        @mouseout="${this.mouseMoveCallback}"
+                        @mousedown="${this.mouseMoveCallback}"
                     >
                         <filter id="dropshadow" height="130%">
                           <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
@@ -291,9 +303,9 @@ class MapRenderer extends LitElement {
                           </feMerge>
                         </filter>
                         ${locations.map((loc, i) => (svg`
-                            <g class="geometry" style=${styleMap({
+                            <g class="geometry" style="${styleMap({
                                 fill: `rgb(${colors[i][0]},${colors[i][1]},${colors[i][2]})`,
-                            })} .location_data=${loc}>
+                            })}" .location_data="${loc}">
                                 ${loc.svg}
                             </g>
                         `))}

@@ -3,6 +3,7 @@ import { html } from 'lit-element';
 import { render } from 'lit-html';
 import 'typeface-roboto';
 
+import './map-renderer';
 import { Router } from './router';
 import './index.css';
 
