@@ -79,9 +79,9 @@ fn write_i32(file: &mut File, value: i32) {
     ]).unwrap();
 }
 
-const MAX_POINTS_PER_PATH: i32 = 1024;
-const MAX_POLY_PARTS: i32 = 64;
-const MAX_POLYGONS: i32 = 256;
+const MAX_POINTS_PER_PATH: i32 = 256;
+const MAX_POLY_PARTS: i32 = 4;
+const MAX_POLYGONS: i32 = 4;
 
 fn cross_product(x: &(f64, f64), y: &(f64, f64)) -> f64 {
     return (x.0 * y.0) - (x.1 * y.0);
