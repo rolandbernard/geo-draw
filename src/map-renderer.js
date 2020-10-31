@@ -1,5 +1,6 @@
 
-import { LitElement, html, svg } from 'lit-element';
+import { LitElement, html, svg, css } from 'lit-element';
+import { styleMap } from 'lit-html/directives/style-map';
 import { until } from 'lit-html/directives/until';
 
 class MapRenderer extends LitElement {
@@ -8,6 +9,98 @@ class MapRenderer extends LitElement {
         return {
             data: { type: Object },
         };
+    }
+    
+    static get styles() {
+        return css`
+            div#map-renderer-root {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 100%;
+                height: 100%;
+                overflow: visible;
+            }
+            svg.wrapping-svg {
+                stroke: var(--background-light);
+                stroke-width: 0.25%;
+                stroke-opacity: 0.5;
+                stroke-linejoin: round;
+                stroke-linecap: round;
+                filter: url(#dropshadow);
+            }
+            g.geometry:hover {
+                filter: brightness(0.75);
+            }
+            div#map-wrapper {
+                position: relative;
+            }
+            div#info-box-wrapper {
+                position: absolute;
+                top: 0;
+                left: 0;
+                z-index: 100;
+                transform: translate(-50%, calc(-100% - 8.5px));
+                display: none;
+                pointer-events: none;
+            }
+            div#info-box-wrapper.visible {
+                display: block;
+            }
+            div#info-box {
+                padding: 0.5rem;
+                font-size: 0.9rem;
+                font-family: Roboto, sans-serif;
+                display: block;
+                width: max-content;
+                height: max-content;
+                max-width: 15rem;
+            }
+            div#info-box-name {
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+            div#info-box-background {
+                display: block;
+                position: absolute;
+                background: var(--background-light);
+                width: 100%;
+                height: 100%;
+                border-radius: 4px;
+                opacity: 0.7;
+                z-index: -1;
+            }
+            div#info-box-background::before {
+                content: '';
+                box-shadow: var(--shadow-small);
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                top: 0;
+                left: 0;
+                border-radius: 4px;
+            }
+            div#info-box-background::after {
+                content: '';
+                position: absolute;
+                width: 12px;
+                height: 12px;
+                bottom: 0;
+                left: 0;
+                margin-left: 50%;
+                transform: translate(-50%, 50%) rotate(45deg);
+                background: var(--background-light);
+            }
+            div.info-field {
+                display: flex;
+                flex-flow: row nowrap;
+            }
+            span.info-field-name {
+                flex: 1 0 auto;
+                padding-right: 0.5rem;
+            }
+        `;
     }
 
     static parseBinaryData(array_buffer) {
@@ -48,7 +141,7 @@ class MapRenderer extends LitElement {
 
     static project([lon, lat]) {
         return [
-            (Math.PI + (lon * Math.PI / 180)),
+            (Math.PI + (lon * Math.PI / 180)) * 1000,
             (
                 Math.abs(lat) > 89.5
                     ? Math.sign(lat) * 89.5
@@ -56,14 +149,63 @@ class MapRenderer extends LitElement {
                         const phi = lat * Math.PI / 180;
                         return Math.PI - Math.log(Math.tan(Math.PI / 4 + phi / 2));
                     })()
-            )
+            ) * 1000
         ];
     }
 
+    static parseColor(str) {
+        const match = str.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+        if(match) {
+            return [parseInt(match[1], 16), parseInt(match[2], 16), parseInt(match[3], 16)];
+        } else {
+            return [255, 255, 255];
+        }
+    }
+
+    static blendColors(colors, proportion) {
+        const ret = [0, 0, 0];
+        colors.forEach((col, i) => ret.forEach((el, j) => ret[j] += col[j]*col[j]*proportion[i]));
+        return ret.map(el => Math.sqrt(el));
+    }
+
+    static colorPropScale(prop) {
+        return Math.log10(99 * prop + 1) / 2;
+    }
+    
+    mouseMoveCallback(event) {
+        const x = event.clientX;
+        const y = event.clientY;
+        let elem = this.shadowRoot.elementFromPoint(x, y);
+        if(elem?.tagName === 'path') {
+            elem = elem.parentNode;
+        }
+        const info_box = this.shadowRoot.getElementById('info-box-wrapper');
+        if(elem?.location_data) {
+            const location = elem?.location_data;
+            if (!info_box.current_location !== location) {
+                const name = this.shadowRoot.getElementById('info-box-name');
+                const map_wrapper = this.shadowRoot.getElementById('map-wrapper');
+                const elem_pos = elem.getBoundingClientRect();
+                info_box.style.top = (elem_pos.y - map_wrapper.offsetTop + elem_pos.height / 2) + 'px';
+                info_box.style.left = (elem_pos.x - map_wrapper.offsetLeft + elem_pos.width / 2) + 'px';
+                name.innerText = location.name.split(',')[0];
+                Array.from(info_box.getElementsByClassName('info-field-value')).forEach((el, i) => {
+                    el.innerText = Math.round(location.data[i] * 100) / 100;
+                });
+                info_box.classList.add('visible');
+                info_box.current_location = location;
+            }
+        } else {
+            info_box.classList.remove('visible');
+            info_box.current_location = null;
+        }
+    }
+
     async drawMap() {
-        console.log(this.data);
-        if(this.data?.locations) {
-            const locations_promise = Promise.all(this.data.locations.map(async location => {
+        const data = this.data;
+        console.log(data);
+        if(data?.locations) {
+            const locations_promise = Promise.all(data.locations.map(async location => {
                 const res = await fetch(`/static/data/${location}.bin`);
                 const data = MapRenderer.parseBinaryData(await res.arrayBuffer());
                 data.coords = data.coords.map(poly => poly.map(part => part.map(([lon, lat]) => MapRenderer.project([lon / 1e7, lat / 1e7]))));
@@ -85,25 +227,80 @@ class MapRenderer extends LitElement {
                     )),
                 };
             }));
-
-            const locations = await locations_promise;
+            const color_data = data.data.map(row => row.filter((_, i) => data.color_using ? data.color_using.find(el => el === i) : true));
+            const defcolor = MapRenderer.parseColor(data.defcolor || "#ffffff");
+            let colors;
+            if(color_data?.[0].length > 0) {
+                const max_data = color_data.reduce((a, b) => a.map((el, i) => Math.max(el, b[i])));
+                colors = color_data.map(data_vec => {
+                    if(data_vec.length == 1) {
+                        const color = MapRenderer.parseColor(data.colors[0]);
+                        const prop = MapRenderer.colorPropScale(data_vec[0] / max_data[0]);
+                        return MapRenderer.blendColors([color, defcolor], [prop, 1 - prop]);
+                    } else {
+                        const sum = data_vec.reduce((a, b) => a + b);
+                        const colors = data.colors.map(col => MapRenderer.parseColor(col));
+                        const prop = data_vec.map(el => el / sum);
+                        return MapRenderer.blendColors(colors, prop);
+                    }
+                });
+            } else {
+                colors = data.locations.map(() => defcolor);
+            }
+            const locations = (await locations_promise).map((loc, i) => ({...loc, data: data.data[i], columns: data.columns}));
             const min = locations.map(loc => loc.min).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]);
             const max = locations.map(loc => loc.max).reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]);
-            console.log(locations);
             return html`
-                <svg viewBox=${min[0] + " " + min[1] + " " + (max[0] - min[0]) + " " + (max[1] - min[1])}>
-                    ${locations.map(loc => svg`<g>${loc.svg}</g>`)}
-                </svg>
+                <div id="map-wrapper">
+                    <div id="info-box-wrapper">
+                        <div id="info-box-background"></div>
+                        <div id="info-box">
+                            <div id="info-box-name"></div>
+                            <hr />
+                            ${data.columns.map(col => (html`
+                                <div class="info-field">
+                                    <span class="info-field-name">${col}</span>
+                                    <span class="info-field-value"></span>
+                                </div>
+                            `))}
+                        </div>
+                    </div>
+                    <svg
+                        class="wrapping-svg"
+                        xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+                        viewBox=${min[0] + " " + min[1] + " " + (max[0] - min[0]) + " " + (max[1] - min[1])}
+                        @mousemove=${this.mouseMoveCallback}
+                        @mouseout=${this.mouseMoveCallback}
+                    >
+                        <filter id="dropshadow" height="130%">
+                          <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+                          <feOffset dx="2" dy="2" result="offsetblur"/>
+                          <feComponentTransfer>
+                            <feFuncA type="linear" slope="0.25"/>
+                          </feComponentTransfer>
+                          <feMerge> 
+                            <feMergeNode/>
+                            <feMergeNode in="SourceGraphic"/>
+                          </feMerge>
+                        </filter>
+                        ${locations.map((loc, i) => (svg`
+                            <g class="geometry" style=${styleMap({
+                                fill: `rgb(${colors[i][0]},${colors[i][1]},${colors[i][2]})`,
+                            })} .location_data=${loc}>
+                                ${loc.svg}
+                            </g>
+                        `))}
+                    </svg>
+                </div>
             `;
         } else {
-            return html`<div>No data</div>`
+            return html`<div class="no-data">No data</div>`
         }
     }
 
     render() {
         return html`
-            <style></style>
-            <div>
+            <div id="map-renderer-root">
                 ${until(this.drawMap(), "Loading...")}
             </div>
         `;

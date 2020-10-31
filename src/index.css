@@ -1,15 +1,22 @@
 
 /*
-Background dark: #373F51
-Background light: #F8F8F8
-Primary: #008DD5
-Secondary: #CE8147
-Accent: #B3001B
 */
 
 * {
+    --background-dark: #373F51;
+    --background-light: #F8F8F8;
+    --primary: #008DD5;
+    --secondary: #CE8147;
+    --accent: #B3001B;
+    --shadow-large: 0px 2px 4px -1px rgba(0,0,0,0.2),
+        0px 4px 5px 0px rgba(0,0,0,0.14),
+        0px 1px 10px 0px rgba(0,0,0,0.12);
+    --shadow-small: 0px 2px 4px -2px rgba(0,0,0,0.2),
+        0px 4px 5px -2px rgba(0,0,0,0.14),
+        0px 1px 10px -2px rgba(0,0,0,0.12);
     padding: 0;
     margin: 0;
-    background: #F8F8F8;
+    background: var(--background-light);
     user-select: none;
+    box-sizing: border-box;
 }
