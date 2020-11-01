@@ -1,6 +1,8 @@
 
 import { css, html, LitElement } from 'lit-element'
+import { styleMap } from 'lit-html/directives/style-map';
 
+import './map-renderer';
 import Icon from './icon.svg';
 
 const data = {
@@ -87,13 +89,21 @@ class EditingView extends LitElement {
             }
             div.content-root {
                 display: flex;
-                flex-flow: column;
                 flex: 1 1 100%;
+                flex-flow: row nowrap;
+            }
+            @media (max-aspect-ratio: 1) {
+                div.content-root {
+                    flex-flow: column;
+                }
             }
             div.editing, div.renderer {
                 flex: 1 1 50%;
                 min-height: 50%;
                 min-width: 50%;
+            }
+            div.renderer {
+                box-shadow: var(--shadow-large);
             }
             :host {
                 height: 100%;

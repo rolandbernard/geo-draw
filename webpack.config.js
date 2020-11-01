@@ -10,17 +10,17 @@ const webcomponentsjs = './node_modules/@webcomponents/webcomponentsjs';
 const polyfills = [
     {
         from: path.resolve(`${webcomponentsjs}/webcomponents-*.{js,map}`),
-        to: 'poly',
+        to: 'vendor',
         flatten: true
     },
     {
         from: path.resolve(`${webcomponentsjs}/bundles/*.{js,map}`),
-        to: 'poly/bundles',
+        to: 'vendor/bundles',
         flatten: true
     },
     {
         from: path.resolve(`${webcomponentsjs}/custom-elements-es5-adapter.js`),
-        to: 'poly',
+        to: 'vendor',
         flatten: true
     },
 ];
