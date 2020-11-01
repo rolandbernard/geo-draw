@@ -200,23 +200,21 @@ fn generate_data(
 ) {
     if geojson["type"] == "FeatureCollection" {
         for features in geojson["features"].members() {
-            let id;
-            let name;
             if !features["properties"]["shapeID"].is_null() {
                 // Data exported from geoboundaries.org
-                id = features["properties"]["shapeID"].as_str().unwrap_or("").to_string();
+                let id = features["properties"]["shapeID"].as_str().unwrap_or("").to_string();
                 let parents = features["properties"]["ADMHIERACHY"].as_str().unwrap_or(&id).split(",");
-                name = generate_name(locations, parents.clone(), false);
+                let name = generate_name(locations, parents.clone(), false);
                 let frag_name = generate_name(locations, parents, true);
                 generate_fragments(fragments, id.to_string(), &frag_name);
                 names.insert(id.to_string(), name.clone());
-                write_to_file(&id, &name, &features["geomerty"]);
+                write_to_file(&id, &name, &features["geometry"]);
             } else if !features["properties"]["id"].is_null() {
-                id = features["properties"]["id"].as_i32().unwrap().to_string();
+                let id = features["properties"]["id"].as_i32().unwrap().to_string();
                 // Data exported from OpenStreetMap
                 let parents = format!("{},{}", id, features["properties"]["parents"].as_str().unwrap_or(""));
                 let split_parents = parents.split(",");
-                name = generate_name(locations, split_parents.clone(), false);
+                let name = generate_name(locations, split_parents.clone(), false);
                 let frag_name = generate_name(locations, split_parents, true);
                 generate_fragments(fragments, id.to_string(), &frag_name);
                 names.insert(id.to_string(), name.clone());
