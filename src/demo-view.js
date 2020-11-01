@@ -31,17 +31,20 @@ class DemoView extends LitElement {
 
     async fetchData() {
         const path = window.location.hash || '#/';
-        const demo = path.match(new RegExp('#/demo/(.+)'))?.[1];
-        if(!demo) {
-            window.location.hash = '#/404';
-        } else {
-            try {
-                const response = await fetch(`${demo_location}/${demo}.json`);
-                const data = await response.json();
-                this.data = data;
-                return this.data;
-            } catch(e) {
+        const demo_match = path.match(new RegExp('#/?demo/(.+)'));
+        if(demo_match) {
+            const demo = demo_match?.[1];
+            if(!demo) {
                 window.location.hash = '#/404';
+            } else {
+                try {
+                    const response = await fetch(`${demo_location}/${demo}.json`);
+                    const data = await response.json();
+                    this.data = data;
+                    return this.data;
+                } catch(e) {
+                    window.location.hash = '#/404';
+                }
             }
         }
     }

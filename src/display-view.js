@@ -28,14 +28,17 @@ class DisplayView extends LitElement {
 
     fetchData() {
         const path = window.location.hash || '#/';
-        const data = path.match(new RegExp('#/view/(.+)'))?.[1];
-        if(!data) {
-            window.location.hash = '#/404';
-        } else {
-            try {
-                this.data = JSON.parse(atob(data));
-            } catch(e) {
+        const data_match = path.match(new RegExp('#/?view/(.+)'));
+        if(data_match) {
+            const data = data_match?.[1];
+            if(!data) {
                 window.location.hash = '#/404';
+            } else {
+                try {
+                    this.data = JSON.parse(atob(data));
+                } catch(e) {
+                    window.location.hash = '#/404';
+                }
             }
         }
     }

@@ -52,7 +52,7 @@ export class Router {
                     render(route.html, this.component);
                     if(route.callback) {
                         const req = { path, match }
-                        route.callback(req);
+                        route.callback?.(req);
                     }
                 }
                 run_default = false;
@@ -62,7 +62,7 @@ export class Router {
         if(run_default && this.last_route !== this.default_route) {
             this.last_route = this.default_route;
             render(this.default_route.html, this.component);
-            this.default_route.callback();
+            this.default_route.callback?.();
         }
     }
 
