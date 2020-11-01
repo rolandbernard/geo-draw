@@ -48,18 +48,19 @@ export class Router {
             const match = path.match(regEx);
             if(match) {
                 if(this.last_route !== route) {
+                    this.last_route = route;
                     render(route.html, this.component);
                     if(route.callback) {
                         const req = { path, match }
                         route.callback(req);
                     }
-                    this.last_route = route;
                 }
                 run_default = false;
                 break;
             }
         }
         if(run_default && this.last_route !== this.default_route) {
+            this.last_route = this.default_route;
             render(this.default_route.html, this.component);
             this.default_route.callback();
         }
