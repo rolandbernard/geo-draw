@@ -28,7 +28,7 @@ const polyfills = [
 const assets = [
     {
         from: 'static/',
-        to: 'static/'
+        to: 'static/',
     },
 ];
 

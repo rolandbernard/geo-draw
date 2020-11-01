@@ -53,6 +53,7 @@ export class Router {
                         const req = { path, match }
                         route.callback(req);
                     }
+                    this.last_route = route;
                 }
                 run_default = false;
                 break;

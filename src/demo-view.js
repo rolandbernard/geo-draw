@@ -3,6 +3,7 @@ import { css, html, LitElement } from 'lit-element'
 import { until } from 'lit-html/directives/until';
 
 import './map-renderer';
+import './ui/spinner';
 
 class DemoView extends LitElement {
 
@@ -17,6 +18,11 @@ class DemoView extends LitElement {
             div.demo-view-root {
                 width: 100%;
                 height: 100%;
+                background: var(--background-dark);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
             }
         `;
     }
@@ -27,11 +33,11 @@ class DemoView extends LitElement {
         if(!demo) {
             window.location.hash = '#/404';
         } else {
-            let data = {};
             try {
                 const response = await fetch(`/static/demo/${demo}.json`);
-                data = await response.json();
+                const data = await response.json();
                 this.data = data;
+                return this.data;
             } catch(e) {
                 window.location.hash = '#/404';
             }
@@ -53,7 +59,7 @@ class DemoView extends LitElement {
     render() {
         return html`
             <div class="demo-view-root">
-                ${until(this.renderAfterFetch(), 'Loading...')}
+                ${until(this.renderAfterFetch(), html`<ui-spinner></ui-spinner>`)}
             </div>
         `;
     }

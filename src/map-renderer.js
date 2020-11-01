@@ -3,6 +3,8 @@ import { LitElement, html, svg, css } from 'lit-element';
 import { styleMap } from 'lit-html/directives/style-map';
 import { until } from 'lit-html/directives/until';
 
+import './ui/spinner';
+
 const location_cache = {};
 
 class MapRenderer extends LitElement {
@@ -27,12 +29,14 @@ class MapRenderer extends LitElement {
                 width: 100%;
                 height: 100%;
                 overflow: visible;
-                display: block;
                 position: relative;
                 color: white;
                 padding: 1rem;
                 --background: var(--background-dark);
                 background: var(--background);
+                display: flex;
+                align-items: center;
+                justify-content: center;
             }
             svg.wrapping-svg {
                 stroke: var(--background);
@@ -45,6 +49,9 @@ class MapRenderer extends LitElement {
                 max-width: 100%;
                 max-height: 100%;
                 display: block;
+            }
+            svg.wrapping-svg g:hover {
+                fill-opacity: 0.75;
             }
             div#map-wrapper {
                 position: relative;
@@ -152,7 +159,7 @@ class MapRenderer extends LitElement {
                 padding: 0 1rem 1rem 0;
                 bottom: 0;
                 right: 0;
-                font-size: 0.75rem;
+                font-size: 0.85rem;
                 font-family: Roboto, sans-serif;
                 display: grid;
                 grid-template-columns: auto auto;
@@ -167,8 +174,10 @@ class MapRenderer extends LitElement {
             span.color-gradiant span.scale {
                 display: block;
                 height: 5rem;
-                width: 0.5rem;
+                width: 0.65rem;
                 box-shadow: var(--shadow-small);
+                margin-top: 0.25rem;
+                margin-bottom: 0.25rem;
             }
             span.color-block {
                 display: block;
@@ -256,9 +265,6 @@ class MapRenderer extends LitElement {
     mouseMoveCallback(event) {
         const x = event.clientX;
         const y = event.clientY;
-        if(!x || !y) {
-            console.log(event);
-        }
         let elem = this.shadowRoot.elementFromPoint(x, y);
         if(elem?.tagName === 'path') {
             elem = elem.parentNode;
@@ -424,7 +430,7 @@ class MapRenderer extends LitElement {
     render() {
         return html`
             <div id="map-renderer-root">
-                ${until(this.drawMap(), 'Loading...')}
+                ${until(this.drawMap(), html`<ui-spinner></ui-spinner>`)}
             </div>
         `;
     }

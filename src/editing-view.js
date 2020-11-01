@@ -3,7 +3,7 @@ import { css, html, LitElement } from 'lit-element'
 import { styleMap } from 'lit-html/directives/style-map';
 
 import './map-renderer';
-import Icon from './icon.svg';
+import Icon from './icons/logo.svg';
 
 const data = {
     title: 'Coronavirus in Südtirol',

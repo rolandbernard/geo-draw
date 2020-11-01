@@ -4,3 +4,4 @@ node_modules/
 /static/demo/
 /dist/
 /data/
+/updater/
