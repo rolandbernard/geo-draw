@@ -5,6 +5,7 @@ import { until } from 'lit-html/directives/until';
 
 import './ui/spinner';
 
+const data_location = 'static/data/';
 const location_cache = {};
 
 class MapRenderer extends LitElement {
@@ -185,6 +186,13 @@ class MapRenderer extends LitElement {
                 width: 0.5rem;
                 box-shadow: var(--shadow-small);
             }
+            div.no-data {
+                font-family: Roboto, sans-serif;
+                font-weight: 600;
+                font-size: 2rem; 
+                white-space: nowrap;
+                text-transform: uppercase;
+            }
         `;
     }
 
@@ -299,11 +307,11 @@ class MapRenderer extends LitElement {
     async drawMap() {
         const data = this.data;
         try {
-            if (data?.locations) {
+            if (data?.locations?.length > 0) {
                 const locations_promise = Promise.all(data.locations.map(async location => {
                     if (!location_cache[location]) {
                         try {
-                            const res = await fetch(`/static/data/${location}.bin`);
+                            const res = await fetch(`${data_location}/${location}.bin`);
                             const data = MapRenderer.parseBinaryData(await res.arrayBuffer());
                             data.coords = data.coords.map(poly => poly.map(part => (
                                 part.map(([lon, lat]) => MapRenderer.project([lon / 1e7, lat / 1e7]).map(el => 1000 * el))
@@ -351,6 +359,9 @@ class MapRenderer extends LitElement {
                     colors = data.locations.map(() => defcolor);
                 }
                 const locations = (await locations_promise).map((loc, i) => ({ ...loc, data: data.data[i], columns: data.columns }));
+                if(locations.filter?.(loc => loc).length == 0) {
+                    throw 'No data';
+                }
                 const min = locations.map(loc => loc?.min).reduce((a, b) => [Math.min(a?.[0], b?.[0]), Math.min(a?.[1], b?.[1])]);
                 const max = locations.map(loc => loc?.max).reduce((a, b) => [Math.max(a?.[0], b?.[0]), Math.max(a?.[1], b?.[1])]);
                 const data_min = color_data.reduce((a, b) => a.map((el, i) => Math.min(el, b[i])));
@@ -391,8 +402,8 @@ class MapRenderer extends LitElement {
                             </filter>
                             ${locations.map((loc, i) => (svg`
                                 <g class="geometry" style="${styleMap({
-                        fill: `rgb(${colors[i][0]},${colors[i][1]},${colors[i][2]})`,
-                    })}" .location_data="${loc}">
+                                    fill: `rgb(${colors[i][0]},${colors[i][1]},${colors[i][2]})`,
+                                })}" .location_data="${loc}">
                                     ${loc?.svg}
                                 </g>
                             `))}
@@ -404,7 +415,7 @@ class MapRenderer extends LitElement {
                             ? (data.colors.map((col, i) => (html`
                                 <span class="legend-label">${data.color_using ? data.columns[data.color_using[i]] : data.color_using[i]}</span>
                                 <span class="color-block" style="${styleMap({
-                                background: data.colors[i],
+                                background: col,
                             })}"></span>
                             ` )))
                             : (html`

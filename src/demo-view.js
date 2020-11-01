@@ -5,6 +5,8 @@ import { until } from 'lit-html/directives/until';
 import './map-renderer';
 import './ui/spinner';
 
+const demo_location = 'static/demo/';
+
 class DemoView extends LitElement {
 
     static get properties() {
@@ -34,7 +36,7 @@ class DemoView extends LitElement {
             window.location.hash = '#/404';
         } else {
             try {
-                const response = await fetch(`/static/demo/${demo}.json`);
+                const response = await fetch(`${demo_location}/${demo}.json`);
                 const data = await response.json();
                 this.data = data;
                 return this.data;
