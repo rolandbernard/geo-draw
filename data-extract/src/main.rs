@@ -48,7 +48,12 @@ fn generate_fragments(fragments: &mut HashMap<String, HashMap<String, i32>>, id:
                 let key = striped.clone();
                 fragments.insert(key, HashMap::new());
             }
-            fragments.get_mut(&striped).unwrap().insert(id.clone(), 1);
+            if !fragments[&striped].contains_key(&id) {
+                fragments.get_mut(&striped).unwrap().insert(id.clone(), 1);
+            } else {
+                let new_value = fragments[&striped][&id] + 1;
+                fragments.get_mut(&striped).unwrap().insert(id.clone(), new_value);
+            }
         }
     }
 }
