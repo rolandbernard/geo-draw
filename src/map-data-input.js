@@ -92,7 +92,6 @@ class MapDataInput extends LitElement {
 
     updateData(loc_index, col_index, value) {
         const val = parseFloat(value) || 0;
-        console.log(value);
         this.dispatchOnChange({
             ...this.data,
             data: this.data.data.map((row, i) => row.map((el, j) => loc_index === i && col_index === j ? val : el)),

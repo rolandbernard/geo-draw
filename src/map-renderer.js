@@ -271,9 +271,7 @@ class MapRenderer extends LitElement {
     }
     
     mouseMoveCallback(event) {
-        const x = event.clientX;
-        const y = event.clientY;
-        let elem = this.shadowRoot.elementFromPoint(x, y);
+        let elem = event.target;
         if(elem?.tagName === 'path') {
             elem = elem.parentNode;
         }
@@ -302,6 +300,12 @@ class MapRenderer extends LitElement {
             info_box.classList.remove('visible');
             info_box.current_location = null;
         }
+    }
+    
+    mouseOutCallback() {
+        const info_box = this.shadowRoot.getElementById('info-box-wrapper');
+        info_box.classList.remove('visible');
+        info_box.current_location = null;
     }
 
     async drawMap() {
@@ -385,9 +389,6 @@ class MapRenderer extends LitElement {
                             class="wrapping-svg"
                             xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
                             viewBox="${min[0] + " " + min[1] + " " + (max[0] - min[0]) + " " + (max[1] - min[1])}"
-                            @mousemove="${this.mouseMoveCallback}"
-                            @mouseout="${this.mouseMoveCallback}"
-                            @mousedown="${this.mouseMoveCallback}"
                         >
                             <filter id="dropshadow" height="130%">
                               <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
@@ -403,7 +404,11 @@ class MapRenderer extends LitElement {
                             ${locations.map((loc, i) => (svg`
                                 <g class="geometry" style="${styleMap({
                                     fill: `rgb(${colors[i][0]},${colors[i][1]},${colors[i][2]})`,
-                                })}" .location_data="${loc}">
+                                })}" .location_data="${loc}"
+                                    @mousemove="${this.mouseMoveCallback}"
+                                    @mouseout="${this.mouseOutCallback}"
+                                    @mousedown="${this.mouseMoveCallback}"
+                                >
                                     ${loc?.svg}
                                 </g>
                             `))}
