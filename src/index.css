@@ -1,7 +1,4 @@
 
-/*
-*/
-
 * {
     --background-dark: #373F51;
     --background-light: #F8F8F8;
@@ -18,6 +15,7 @@
     margin: 0;
     user-select: none;
     box-sizing: border-box;
+    font-family: Roboto, sans-serif;
 }
 
 html, body, main {
