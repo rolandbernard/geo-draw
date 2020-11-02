@@ -342,6 +342,9 @@ class MapRenderer extends LitElement {
                     }
                     return location_cache[location];
                 }));
+                if(data.title) {
+                    document.title = data.title;
+                }
                 const color_data = data.data.map(row => data.color_using ? data.color_using.map(el => row[el]) : row);
                 const defcolor = MapRenderer.parseColor(data.defcolor || "#ffffff");
                 let colors;
