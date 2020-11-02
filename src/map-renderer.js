@@ -5,7 +5,7 @@ import { until } from 'lit-html/directives/until';
 
 import './ui/spinner';
 
-const data_location = 'static/data/';
+const data_location = './static/data/';
 const location_cache = {};
 
 class MapRenderer extends LitElement {

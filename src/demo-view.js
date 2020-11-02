@@ -5,7 +5,7 @@ import { until } from 'lit-html/directives/until';
 import './map-renderer';
 import './ui/spinner';
 
-const demo_location = 'static/demo/';
+const demo_location = './static/demo/';
 
 class DemoView extends LitElement {
 

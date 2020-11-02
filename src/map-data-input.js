@@ -4,7 +4,7 @@ import { until } from 'lit-html/directives/until';
 
 import './ui/spinner';
 
-const data_location = 'static/data/';
+const data_location = './static/data/';
 
 class MapDataInput extends LitElement {
 
