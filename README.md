@@ -22,9 +22,9 @@ $ cd geo-draw
 ```
 
 ### Download the data
-You can download the required data you from eighter https://osm-boundaries.com/ or from
+You can download the required data from eighter https://osm-boundaries.com/ or
 https://www.geoboundaries.org/. You can also use other soures of geojson, as long as
-they use the same properties for the name as eighter of the other two sources.
+they use the same properties for the name and id as eighter of the other two sources.
 You should put your data into the `data/` directory.
 ```
 $ mkdir data
