@@ -315,34 +315,42 @@ class MapRenderer extends LitElement {
         try {
             if (data?.locations?.length > 0) {
                 const locations_promise = Promise.all(data.locations.map(async location => {
-                    if (!location_cache[location]) {
-                        try {
-                            const res = await fetch(`${data_location}/${location}.bin`);
-                            const data = MapRenderer.parseBinaryData(await res.arrayBuffer());
-                            data.coords = data.coords.map(poly => poly.map(part => (
-                                part.map(([lon, lat]) => MapRenderer.project([lon / 1e7, lat / 1e7]).map(el => 1000 * el))
-                            )));
-                            location_cache[location] = {
-                                name: data.name,
-                                min: data.coords.flat(2).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
-                                max: data.coords.flat(2).reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
-                                svg: data.coords.map(poly => (
-                                    svg`<path d="${poly.map((part, i) => (
-                                        (i == 0 ? part : part.reverse())
-                                            .map((coord, i) => (
-                                                i == 0
-                                                    ? 'M ' + coord[0] + ',' + coord[1]
-                                                    : 'L ' + coord[0] + ',' + coord[1]
-                                            )).join(' ') + ' z'
-                                    )).join(' ')
-                                        }"/>`
-                                )),
-                            };
-                        } catch (e) {
-                            return null;
+                    if(location) {
+                        if (!location_cache[location]) {
+                            try {
+                                const res = await fetch(`${data_location}/${location}.bin`);
+                                if(res.ok) {
+                                    const data = MapRenderer.parseBinaryData(await res.arrayBuffer());
+                                    data.coords = data.coords.map(poly => poly.map(part => (
+                                        part.map(([lon, lat]) => MapRenderer.project([lon / 1e7, lat / 1e7]).map(el => 1000 * el))
+                                    )));
+                                    location_cache[location] = {
+                                        name: data.name,
+                                        min: data.coords.flat(2).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
+                                        max: data.coords.flat(2).reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
+                                        svg: data.coords.map(poly => (
+                                            svg`<path d="${poly.map((part, i) => (
+                                                (i == 0 ? part : part.reverse())
+                                                    .map((coord, i) => (
+                                                        i == 0
+                                                            ? 'M ' + coord[0] + ',' + coord[1]
+                                                            : 'L ' + coord[0] + ',' + coord[1]
+                                                    )).join(' ') + ' z'
+                                            )).join(' ')
+                                                }"/>`
+                                        )),
+                                    };
+                                } else {
+                                    location_cache[location] = null;
+                                }
+                            } catch (e) {
+                                return null;
+                            }
                         }
+                        return location_cache[location];
+                    } else {
+                        return null;
                     }
-                    return location_cache[location];
                 }));
                 if(data.title) {
                     document.title = data.title;
@@ -367,7 +375,7 @@ class MapRenderer extends LitElement {
                 } else {
                     colors = data.locations.map(() => defcolor);
                 }
-                const locations = (await locations_promise).map((loc, i) => ({ ...loc, data: data.data[i], columns: data.columns }));
+                const locations = (await locations_promise);
                 if(locations.filter?.(loc => loc).length == 0) {
                     throw 'No data';
                 }

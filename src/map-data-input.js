@@ -3,6 +3,7 @@ import { css, html, LitElement } from 'lit-element'
 import { until } from 'lit-html/directives/until';
 
 import './ui/spinner';
+import './location-input';
 
 const data_location = './static/data/';
 
@@ -12,9 +13,7 @@ class MapDataInput extends LitElement {
         return {
             data: {
                 type: Object,
-                hasChanged: (old_value, new_value) => (
-                    old_value?.id !== new_value?.id
-                )
+                hasChanged: (old_value, new_value) => old_value?.id !== new_value?.id,
             },
         };
     }
@@ -83,38 +82,145 @@ class MapDataInput extends LitElement {
     }
 
     dispatchOnChange(data) {
-        if(this.data !== data && JSON.stringify(this.data) !== JSON.stringify(data)) {
-            const event = new Event('change');
-            event.data = data;
-            this.dispatchEvent(event);
-        }
+        const event = new Event('change');
+        event.data = data;
+        this.dispatchEvent(event);
     }
 
     updateData(loc_index, col_index, value) {
         const val = parseFloat(value) || 0;
+        this.data.data[loc_index][col_index] = val;
         this.dispatchOnChange({
             ...this.data,
-            data: this.data.data.map((row, i) => row.map((el, j) => loc_index === i && col_index === j ? val : el)),
+        });
+    }
+
+    updateLocation(loc_index, value) {
+        this.data.locations[loc_index] = value;
+        this.dispatchOnChange({
+            ...this.data,
+        });
+    }
+
+    updateColumn(col_index, value) {
+        this.data.columns[col_index] = value;
+        this.dispatchOnChange({
+            ...this.data,
+        });
+    }
+
+    updateColor(col_index, value) {
+        const color_with = this.data.color_using;
+        if(value) {
+            const entry = color_with.findIndex(el => el === col_index);
+            if(entry === -1) {
+                this.data.color_using.push(col_index);
+                this.data.colors.push(value);
+            } else {
+                this.data.color_using[entry] = col_index;
+                this.data.colors[entry] = value;
+            }
+        } else {
+            color_with.forEach((index, i) => {
+                if(index == col_index) {
+                    this.data.color_using.splice(i, 0);
+                    this.data.colors.splice(i, 0);
+                }
+            });
+        }
+        this.dispatchOnChange({
+            ...this.data,
+        });
+    }
+   
+    addColumn() {
+        this.data.columns.push('');
+        this.data.data.forEach(row => {
+            row.push(0);
+        });
+        this.dispatchOnChange({
+            ...this.data,
+            id: this.data.id + 1,
         });
     }
     
+    removeColumn(index) {
+        const color_with = this.data.color_using;
+        color_with.forEach((el, i) => {
+            if(el === index) {
+                this.data.color_using.splice(i, 1);
+                this.data.colors.splice(i, 1);
+            }
+        });
+        this.data.color_using = this.data.color_using.map(el => el > index ? el - 1 : el);
+        this.data.columns.splice(index, 1);
+        this.data.data.forEach(row => {
+            row.splice(index, 1);
+        });
+        this.dispatchOnChange({
+            ...this.data,
+            id: this.data.id + 1,
+        });
+    }
+
+    addRow() {
+        this.data.locations.push('');
+        this.data.data.push(this.data.columns.map(() => 0));
+        this.dispatchOnChange({
+            ...this.data,
+            id: this.data.id + 1,
+        });
+    }
+
+    removeRow(index) {
+        this.data.locations.splice(index, 1);
+        this.data.data.splice(index, 1);
+        this.dispatchOnChange({
+            ...this.data,
+            id: this.data.id + 1,
+        });
+    }
+
     render() {
         return html`
             <div class="map-input-root">
                 ${until((async () => {
-                    const { names } = await this.index;
+                    const index = await this.index;
+                    const { names } = index;
                     return html`
                         <table>
-                            <tr><td class="header">Locations</td>${this.data.columns.map(col => (html`
+                            <tr><td class="header">Locations</td>${this.data.columns.map((col, i) => (html`
                                 <td class="header">
-                                    <input value="${col}" type="text"/>
+                                    <button
+                                        @click="${() => this.removeColumn(i)}"
+                                    >Remove</button>
+                                    <input
+                                        value="${col}"
+                                        @change="${e => this.updateColumn(i, e.target.value)}"
+                                    />
+                                    <input
+                                        type="color"
+                                        value="${this.data.colors?.[this.data.color_using?.map((u, i) => [u, i])?.find(([u]) => u === i)?.[1]]}"
+                                        @change="${e => this.updateColor(i, e.target.value)}"
+                                    />  
                                 </td>
                             `))}<td>
-                                <button>Add</button>
+                                <button
+                                    @click="${this.addColumn}"
+                                >Add</button>
                             </td></tr>
                             ${this.data.locations.map((loc, i) => (html`
                                 <tr>
-                                    <td class="cell"><input value="${names[loc]}" type="text"/></td>
+                                    <td class="cell">
+                                        <button
+                                            @click="${() => this.removeRow(i)}"
+                                        >Remove</button>
+                                        <location-input
+                                            value="${loc}"
+                                            .index="${index}"
+                                            @change="${e => this.updateLocation(i, e.location_id)}"
+                                        ></location-input>
+                                    </td>
                                     ${this.data.data[i]?.map((data, j) => (html`
                                         <td class="cell">
                                             <input
@@ -127,7 +233,9 @@ class MapDataInput extends LitElement {
                                 </tr>
                             `))}
                             <tr><td>
-                                <button>Add</button>
+                                <button
+                                    @click="${this.addRow}"
+                                >Add</button>
                             </td></tr>
                         </table>
                     `;

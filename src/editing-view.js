@@ -81,7 +81,7 @@ class EditingView extends LitElement {
             const data = data_match?.[3];
             if(!data) {
                 this.data = {
-                    id: this.data_id++,
+                    id: ++this.data_id,
                     title: '',
                     defcolor: '#f0ffff',
                     columns: [],
@@ -115,7 +115,10 @@ class EditingView extends LitElement {
                     <div class="editing">
                         <map-data-input
                             .data="${this.data}"
-                            @change="${(event) => this.data = event.data}"
+                            @change="${(event) => {
+                                this.data = event.data;
+                                this.data_id = this.data.id;
+                            }}"
                         ></map-data-input>
                     </div>
                     <div class="renderer">
