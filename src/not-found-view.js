@@ -35,6 +35,7 @@ class NotFoundView extends LitElement {
     }
 
     render() {
+        document.title = 'Not found';
         return html`
             <div class="not-found-view-root">
                 <div class="content-root">
