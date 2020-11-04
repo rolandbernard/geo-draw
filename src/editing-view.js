@@ -89,7 +89,6 @@ class EditingView extends LitElement {
                 const data = data_match?.[3];
                 if (!data) {
                     this.data = {
-                        id: ++this.data_id,
                         title: '',
                         defcolor: '#f0ffff',
                         columns: [],
@@ -107,7 +106,6 @@ class EditingView extends LitElement {
             }
         } catch (e) {
             this.data = {
-                id: ++this.data_id,
                 title: '',
                 defcolor: '#f0ffff',
                 columns: [],
@@ -121,7 +119,6 @@ class EditingView extends LitElement {
 
     onUpdate(event) {
         this.data = event.data;
-        this.data_id = this.data.id;
         window.location.hash = '#/edit/' + btoa(JSON.stringify(this.data));
     }
 
