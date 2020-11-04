@@ -11,10 +11,7 @@ class MapDataInput extends LitElement {
 
     static get properties() {
         return {
-            data: {
-                type: Object,
-                hasChanged: (old_value, new_value) => old_value?.id !== new_value?.id,
-            },
+            data: {type: Object},
         };
     }
 
@@ -218,7 +215,7 @@ class MapDataInput extends LitElement {
                                         <location-input
                                             value="${loc}"
                                             .index="${index}"
-                                            @change="${e => this.updateLocation(i, e.location_id)}"
+                                            @change="${e => this.updateLocation(i, e.location)}"
                                         ></location-input>
                                     </td>
                                     ${this.data.data[i]?.map((data, j) => (html`

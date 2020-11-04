@@ -375,12 +375,12 @@ class MapRenderer extends LitElement {
                 } else {
                     colors = data.locations.map(() => defcolor);
                 }
-                const locations = (await locations_promise);
+                const locations = (await locations_promise).map((loc, i) => loc ? { ...loc, data: data.data[i], columns: data.columns } : null);
                 if(locations.filter?.(loc => loc).length == 0) {
                     throw 'No data';
                 }
-                const min = locations.map(loc => loc?.min).reduce((a, b) => [Math.min(a?.[0], b?.[0]), Math.min(a?.[1], b?.[1])]);
-                const max = locations.map(loc => loc?.max).reduce((a, b) => [Math.max(a?.[0], b?.[0]), Math.max(a?.[1], b?.[1])]);
+                const min = locations.filter(loc => loc).map(loc => loc.min).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]);
+                const max = locations.filter(loc => loc).map(loc => loc.max).reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]);
                 const data_min = color_data.reduce((a, b) => a.map((el, i) => Math.min(el, b[i])));
                 const data_max = color_data.reduce((a, b) => a.map((el, i) => Math.max(el, b[i])));
                 return html`
