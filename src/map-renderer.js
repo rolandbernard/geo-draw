@@ -87,6 +87,8 @@ class MapRenderer extends LitElement {
                 width: max-content;
                 height: max-content;
                 max-width: 15rem;
+                min-width: 150px;
+                width: 100%;
             }
             div#info-box-name {
                 overflow: hidden;
@@ -220,9 +222,9 @@ class MapRenderer extends LitElement {
                 const num_cords = data_view.getUint32(len, true);
                 len += 4;
                 for (let c = 0; c < num_cords; c++) {
-                    const lon = data_view.getUint32(len, true);
+                    const lon = data_view.getInt32(len, true);
                     len += 4;
-                    const lat = data_view.getUint32(len, true);
+                    const lat = data_view.getInt32(len, true);
                     len += 4;
                     coords[p][t].push([lon, lat]);
                 }
@@ -237,14 +239,13 @@ class MapRenderer extends LitElement {
     static project([lon, lat]) {
         return [
             (Math.PI + (lon * Math.PI / 180)),
-            (
-                Math.abs(lat) > 89.5
-                    ? Math.sign(lat) * 89.5
-                    : (() => {
-                        const phi = lat * Math.PI / 180;
-                        return Math.PI - Math.log(Math.tan(Math.PI / 4 + phi / 2));
-                    })()
-            )
+            ((() => {
+                if (Math.abs(lat) > 85) {
+                    lat = Math.sign(lat) * 85;
+                } 
+                const phi = lat * Math.PI / 180;
+                return Math.PI - Math.log(Math.tan(Math.PI / 4 + phi / 2));
+            })())
         ];
     }
 
