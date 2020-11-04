@@ -81,7 +81,6 @@ class LocationInput extends LitElement {
             const sorted = Object.keys(fragment_map).map(id => [id, fragment_map[id], this.index.names[id]])
                 .sort(([_, a, na], [__, b, nb]) => a < b ? true : b < a ? false : na.length > nb.length);
             this.complete = sorted.map(([id, _, name]) => ({ id, name }));
-            console.log(fragment_map, search_fargments, this.complete);
         } else {
             this.complete = Object.keys(this.index.names).map(id => ({ id, name: this.index.names[id] })).sort((a, b) => a.name > b.name);
         }
@@ -109,12 +108,6 @@ class LocationInput extends LitElement {
             this.dispatchEvent(event);
         }
     }
-    
-    onFocus() {
-        const event = new Event('change');
-        event.location = this.complete[this.selected].id;
-        this.dispatchEvent(event);
-    }
 
     updated() {
         const selected = this.shadowRoot.querySelector('div.autocomplete div.complete.selected');
@@ -125,7 +118,6 @@ class LocationInput extends LitElement {
     
     update(props) {
         if(props.has('value')) {
-            console.log('update change');
             this.string_value = this.index?.names?.[this.value];
             if(this.string_value === undefined) {
                 this.string_value = '';

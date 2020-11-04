@@ -58,10 +58,32 @@ class MapDataInput extends LitElement {
         `;
     }
 
+    static multiplyIndex(frags) {
+        const ret = {};
+        Object.keys(frags).map(name => (
+            [name.split('').reduce((a, c) => a.concat((a[a.length - 1] || '') + c),[]), frags[name]]
+        )).forEach(([frags, ids]) => {
+            frags.forEach(fragment => {
+                if(ret[fragment]) {
+                    Object.keys(ids).forEach(id => {
+                        if(ret[fragment][id]) {
+                            ret[fragment][id] += ids[id];
+                        } else {
+                            ret[fragment][id] = ids[id];
+                        }
+                    });
+                } else {
+                    ret[fragment] = {...ids};
+                }
+            });
+        });
+        return ret;
+    }
+
     async loadIndex() {
         try {
             const fragments = await fetch(`${data_location}/index_fragments.json`);
-            this.index_fragments = await fragments.json();
+            this.index_fragments = MapDataInput.multiplyIndex(await fragments.json());
             const names = await fetch(`${data_location}/index_names.json`);
             this.index_names = await names.json();
             return {
@@ -108,6 +130,7 @@ class MapDataInput extends LitElement {
 
     updateColor(col_index, value) {
         const color_with = this.data.color_using;
+        console.log(value);
         if(value) {
             const entry = color_with.findIndex(el => el === col_index);
             if(entry === -1) {
@@ -118,12 +141,14 @@ class MapDataInput extends LitElement {
                 this.data.colors[entry] = value;
             }
         } else {
+            console.log(this.data.color_using);
             color_with.forEach((index, i) => {
-                if(index == col_index) {
-                    this.data.color_using.splice(i, 0);
-                    this.data.colors.splice(i, 0);
+                if(index === col_index) {
+                    this.data.color_using.splice(i, 1);
+                    this.data.colors.splice(i, 1);
                 }
             });
+            console.log(this.data.color_using);
         }
         this.dispatchOnChange({
             ...this.data,
@@ -137,7 +162,6 @@ class MapDataInput extends LitElement {
         });
         this.dispatchOnChange({
             ...this.data,
-            id: this.data.id + 1,
         });
     }
     
@@ -156,7 +180,6 @@ class MapDataInput extends LitElement {
         });
         this.dispatchOnChange({
             ...this.data,
-            id: this.data.id + 1,
         });
     }
 
@@ -165,7 +188,6 @@ class MapDataInput extends LitElement {
         this.data.data.push(this.data.columns.map(() => 0));
         this.dispatchOnChange({
             ...this.data,
-            id: this.data.id + 1,
         });
     }
 
@@ -174,7 +196,20 @@ class MapDataInput extends LitElement {
         this.data.data.splice(index, 1);
         this.dispatchOnChange({
             ...this.data,
-            id: this.data.id + 1,
+        });
+    }
+
+    updateTitle(title) {
+        this.data.title = title;
+        this.dispatchOnChange({
+            ...this.data,
+        });
+    }
+
+    updateDefaultColor(color) {
+        this.data.defcolor = color;
+        this.dispatchOnChange({
+            ...this.data,
         });
     }
 
@@ -185,6 +220,17 @@ class MapDataInput extends LitElement {
                     const index = await this.index;
                     const { names } = index;
                     return html`
+                        <div>
+                            <span><span>Title:</span><input
+                                value="${this.data.title}"
+                                @change="${e => this.updateTitle(e.target.value)}"
+                            /></span>
+                            <span><span>Default color:</span><input
+                                type="color"
+                                value="${this.data.defcolor}"
+                                @change="${e => this.updateDefaultColor(e.target.value)}"
+                            /></span>
+                        </div>
                         <table>
                             <tr><td class="header">Locations</td>${this.data.columns.map((col, i) => (html`
                                 <td class="header">
@@ -196,9 +242,25 @@ class MapDataInput extends LitElement {
                                         @change="${e => this.updateColumn(i, e.target.value)}"
                                     />
                                     <input
+                                        class="color-input"
+                                        key="${i}"
                                         type="color"
                                         value="${this.data.colors?.[this.data.color_using?.map((u, i) => [u, i])?.find(([u]) => u === i)?.[1]]}"
                                         @change="${e => this.updateColor(i, e.target.value)}"
+                                    />  
+                                    <input
+                                        type="checkbox"
+                                        ?checked="${this.data.color_using?.findIndex(u => u === i) !== -1 ? true : false}"
+                                        @change="${e => {
+                                            if(e.target.checked) {
+                                                const color = this.shadowRoot.querySelector(`input.color-input[key="${i}"]`)?.value;
+                                                if(color) {
+                                                    this.updateColor(i, color)
+                                                }
+                                            } else {
+                                                this.updateColor(i, null)
+                                            }
+                                        }}"
                                     />  
                                 </td>
                             `))}<td>
