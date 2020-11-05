@@ -8,7 +8,8 @@ This is only a small project I started to learn the LitElement library and try o
 the Rust programming language a bit.
 
 The website is not yet finished, but a example of what is possible can be found here:
-https://rolandbernard.github.io/geo-draw/#/demo/covid-south-tyrol-newest
+* https://rolandbernard.github.io/geo-draw/#/demo/covid-south-tyrol-newest
+* https://rolandbernard.github.io/geo-draw/#/demo/covid-italy-newest
 
 ## Setup
 If you run the application yourself you will have to clone the repository, download
