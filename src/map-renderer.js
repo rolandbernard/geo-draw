@@ -348,8 +348,8 @@ class MapRenderer extends LitElement {
                                                             ? 'M ' + coord[0] + ',' + coord[1]
                                                             : 'L ' + coord[0] + ',' + coord[1]
                                                     )).join(' ') + ' z'
-                                            )).join(' ')
-                                                }"/>`
+                                                )).join(' ')
+                                            }"/>`
                                         )),
                                     };
                                 } else {
