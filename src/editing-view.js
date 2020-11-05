@@ -74,37 +74,54 @@ class EditingView extends LitElement {
         `;
     }
 
-    fetchData() {
-        const path = window.location.hash || '#/';
-        const data_match = path.match(new RegExp('#/?(edit(/(.*))?)?'));
-        if(data_match) {
-            const data = data_match?.[3];
-            if(!data) {
-                this.data = {
-                    id: this.data_id++,
-                    title: '',
-                    defcolor: '#f0ffff',
-                    columns: [],
-                    color_using: [],
-                    colors: [],
-                    locations: [],
-                    data: [],
-                };
-            } else {
-                try {
-                    this.data = JSON.parse(atob(data));
-                } catch(e) {
-                    this.data = {};
-                }
-            }
-        }
-    }
-
     constructor() {
         super();
         this.data_id = 0;
         this.fetchData();
         window.addEventListener('hashchange', this.fetchData.bind(this));
+    }
+
+    fetchData() {
+        try {
+            const path = window.location.hash || '#/';
+            const data_match = path.match(new RegExp('#/?(edit(/(.*))?)?'));
+            if (data_match) {
+                const data = data_match?.[3];
+                if (!data) {
+                    this.data = {
+                        id: this.data_id++,
+                        title: '',
+                        defcolor: '#f0ffff',
+                        columns: [],
+                        color_using: [],
+                        colors: [],
+                        locations: [],
+                        data: [],
+                    };
+                } else {
+                    const new_data = JSON.parse(atob(data));
+                    if(JSON.stringify(this.data) !== JSON.stringify(new_data)) {
+                        this.data = new_data;
+                    }
+                }
+            }
+        } catch (e) {
+            this.data = {
+                id: this.data_id++,
+                title: '',
+                defcolor: '#f0ffff',
+                columns: [],
+                color_using: [],
+                colors: [],
+                locations: [],
+                data: [],
+            };
+        }
+    }
+
+    onUpdate(event) {
+        this.data = event.data;
+        window.location.hash = '#/edit/' + btoa(JSON.stringify(this.data));
     }
 
     render() {
@@ -115,7 +132,7 @@ class EditingView extends LitElement {
                     <div class="editing">
                         <map-data-input
                             .data="${this.data}"
-                            @change="${(event) => this.data = event.data}"
+                            @change="${this.onUpdate})"
                         ></map-data-input>
                     </div>
                     <div class="renderer">

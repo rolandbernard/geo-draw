@@ -87,6 +87,8 @@ class MapRenderer extends LitElement {
                 width: max-content;
                 height: max-content;
                 max-width: 15rem;
+                min-width: 150px;
+                width: 100%;
             }
             div#info-box-name {
                 overflow: hidden;
@@ -220,9 +222,9 @@ class MapRenderer extends LitElement {
                 const num_cords = data_view.getUint32(len, true);
                 len += 4;
                 for (let c = 0; c < num_cords; c++) {
-                    const lon = data_view.getUint32(len, true);
+                    const lon = data_view.getInt32(len, true);
                     len += 4;
-                    const lat = data_view.getUint32(len, true);
+                    const lat = data_view.getInt32(len, true);
                     len += 4;
                     coords[p][t].push([lon, lat]);
                 }
@@ -237,14 +239,13 @@ class MapRenderer extends LitElement {
     static project([lon, lat]) {
         return [
             (Math.PI + (lon * Math.PI / 180)),
-            (
-                Math.abs(lat) > 89.5
-                    ? Math.sign(lat) * 89.5
-                    : (() => {
-                        const phi = lat * Math.PI / 180;
-                        return Math.PI - Math.log(Math.tan(Math.PI / 4 + phi / 2));
-                    })()
-            )
+            ((() => {
+                if (Math.abs(lat) > 85) {
+                    lat = Math.sign(lat) * 85;
+                } 
+                const phi = lat * Math.PI / 180;
+                return Math.PI - Math.log(Math.tan(Math.PI / 4 + phi / 2));
+            })())
         ];
     }
 
@@ -261,7 +262,7 @@ class MapRenderer extends LitElement {
         const ret = [0, 0, 0];
         const sum = proportion.reduce((a, b) => a + b, 0);
         if (sum === 0) {
-            return ret;
+            return colors[0] || ret;
         } else {
             colors.forEach((col, i) => ret.forEach((el, j) => ret[j] += col[j]*col[j]*proportion[i]));
             return ret.map(el => Math.sqrt(el / sum));
@@ -309,40 +310,62 @@ class MapRenderer extends LitElement {
         info_box.classList.remove('visible');
         info_box.current_location = null;
     }
+    
+    static map(value, min_in, max_in, min_out, max_out) {
+        if(min_in === max_in) {
+            return max_out;
+        } else if(value < min_in) {
+            return min_out;
+        } else if(value > max_in) {
+            return max_out;
+        } else {
+            return (value - min_in) / (max_in - min_in) * (max_out - min_out) + min_out;
+        }
+    }
 
     async drawMap() {
         const data = this.data;
         try {
             if (data?.locations?.length > 0) {
                 const locations_promise = Promise.all(data.locations.map(async location => {
-                    if (!location_cache[location]) {
-                        try {
-                            const res = await fetch(`${data_location}/${location}.bin`);
-                            const data = MapRenderer.parseBinaryData(await res.arrayBuffer());
-                            data.coords = data.coords.map(poly => poly.map(part => (
-                                part.map(([lon, lat]) => MapRenderer.project([lon / 1e7, lat / 1e7]).map(el => 1000 * el))
-                            )));
-                            location_cache[location] = {
-                                name: data.name,
-                                min: data.coords.flat(2).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
-                                max: data.coords.flat(2).reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
-                                svg: data.coords.map(poly => (
-                                    svg`<path d="${poly.map((part, i) => (
-                                        (i == 0 ? part : part.reverse())
-                                            .map((coord, i) => (
-                                                i == 0
-                                                    ? 'M ' + coord[0] + ',' + coord[1]
-                                                    : 'L ' + coord[0] + ',' + coord[1]
-                                            )).join(' ') + ' z'
-                                    )).join(' ')
-                                        }"/>`
-                                )),
-                            };
-                        } catch (e) {
-                            return null;
+                    if(location) {
+                        if (!location_cache[location]) {
+                            try {
+                                const res = await fetch(`${data_location}/${location}.bin`);
+                                if(res.ok) {
+                                    const data = MapRenderer.parseBinaryData(await res.arrayBuffer());
+                                    data.coords = data.coords.map(poly => poly.map(part => (
+                                        part.map(([lon, lat]) => MapRenderer.project([lon / 1e7, lat / 1e7]).map(el => 1000 * el))
+                                    )));
+                                    location_cache[location] = {
+                                        name: data.name,
+                                        min: data.coords.reduce((a, b) => a.concat(b), []).reduce((a, b) => a.concat(b), [])
+                                            .reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
+                                        max: data.coords.reduce((a, b) => a.concat(b), []).reduce((a, b) => a.concat(b), [])
+                                            .reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
+                                        svg: data.coords.map(poly => (
+                                            svg`<path d="${poly.map((part, i) => (
+                                                (i == 0 ? part : part.reverse())
+                                                    .map((coord, i) => (
+                                                        i == 0
+                                                            ? 'M ' + coord[0] + ',' + coord[1]
+                                                            : 'L ' + coord[0] + ',' + coord[1]
+                                                    )).join(' ') + ' z'
+                                            )).join(' ')
+                                                }"/>`
+                                        )),
+                                    };
+                                } else {
+                                    location_cache[location] = null;
+                                }
+                            } catch (e) {
+                                return null;
+                            }
                         }
+                        return location_cache[location];
+                    } else {
+                        return null;
                     }
-                    return location_cache[location];
                 }));
                 if(data.title) {
                     document.title = data.title;
@@ -352,27 +375,28 @@ class MapRenderer extends LitElement {
                 let colors;
                 if (color_data?.[0]?.length > 0) {
                     const max_data = color_data.reduce((a, b) => a.map((el, i) => Math.max(el, b[i])));
+                    const min_data = color_data.reduce((a, b) => a.map((el, i) => Math.min(el, b[i])));
                     colors = color_data.map(data_vec => {
                         if (data_vec.length == 1) {
                             const color = MapRenderer.parseColor(data.colors[0]);
-                            const prop = MapRenderer.colorPropScale(data_vec[0] / max_data[0]);
+                            const prop = MapRenderer.colorPropScale(MapRenderer.map(data_vec[0], min_data[0], max_data[0], 0, 1));
                             return MapRenderer.blendColors([color, defcolor], [prop, 1 - prop]);
                         } else {
                             const sum = data_vec.reduce((a, b) => a + b);
                             const colors = data.colors.map(col => MapRenderer.parseColor(col));
-                            const prop = data_vec.map(el => (el / sum));
+                            const prop = data_vec.map(el => (sum !== 0 ? el / sum : 1));
                             return MapRenderer.blendColors(colors, prop);
                         }
                     });
                 } else {
                     colors = data.locations.map(() => defcolor);
                 }
-                const locations = (await locations_promise).map((loc, i) => ({ ...loc, data: data.data[i], columns: data.columns }));
+                const locations = (await locations_promise).map((loc, i) => loc ? { ...loc, data: data.data[i], columns: data.columns } : null);
                 if(locations.filter?.(loc => loc).length == 0) {
                     throw 'No data';
                 }
-                const min = locations.map(loc => loc?.min).reduce((a, b) => [Math.min(a?.[0], b?.[0]), Math.min(a?.[1], b?.[1])]);
-                const max = locations.map(loc => loc?.max).reduce((a, b) => [Math.max(a?.[0], b?.[0]), Math.max(a?.[1], b?.[1])]);
+                const min = locations.filter(loc => loc).map(loc => loc.min).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]);
+                const max = locations.filter(loc => loc).map(loc => loc.max).reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]);
                 const data_min = color_data.reduce((a, b) => a.map((el, i) => Math.min(el, b[i])));
                 const data_max = color_data.reduce((a, b) => a.map((el, i) => Math.max(el, b[i])));
                 return html`
@@ -428,16 +452,19 @@ class MapRenderer extends LitElement {
                                 background: col,
                             })}"></span>
                             ` )))
-                            : (html`
-                                <span class="legend-label">${data.color_using ? data.columns[data.color_using[0]] : data.color_using[0]}</span>
-                                <span class="color-gradiant">
-                                    <span>${Math.round(data_max[0] * 100) / 100}</span>
-                                    <span class="scale" style="${styleMap({
-                                background: `linear-gradient(${data.colors[0]},${data.defcolor})`,
-                            })}"></span>
-                                    <span>${Math.round(data_min[0] * 100) / 100}</span>
-                                </span>
-                            `)
+                            : (data.colors.length >= 1
+                                ? (html`
+                                    <span class="legend-label">${data.color_using ? data.columns[data.color_using[0]] : data.color_using[0]}</span>
+                                    <span class="color-gradiant">
+                                        <span>${Math.round(data_max[0] * 100) / 100}</span>
+                                        <span class="scale" style="${styleMap({
+                                            background: `linear-gradient(${data.colors[0]},${data.defcolor})`,
+                                        })}"></span>
+                                        <span>${Math.round(data_min[0] * 100) / 100}</span>
+                                    </span>
+                                `)
+                                : null
+                            )
                     }</div>
                 `;
             } else {
