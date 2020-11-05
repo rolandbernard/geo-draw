@@ -85,7 +85,7 @@ fn write_i32(file: &mut File, value: i32) {
 }
 
 const MAX_POINTS_PER_PATH: i32 = 512;
-const MAX_POLY_PARTS: i32 = 4;
+const MAX_POLY_PARTS: i32 = 16;
 const MAX_POLYGONS: i32 = 16;
 
 fn cross_product(x: &(f64, f64), y: &(f64, f64)) -> f64 {
@@ -106,15 +106,7 @@ fn polygon_outer_size(poly: &json::JsonValue) -> i64 {
 }
 
 fn write_poly_part(file: &mut File, part: &json::JsonValue) {
-    let mut length = 0.0;
-    let mut last = (0.0, 0.0);
-    for c in part.members() {
-        let dist = (c[0].as_f64().unwrap_or(0.0) - last.0, c[1].as_f64().unwrap_or(0.0) - last.1);
-        last = (c[0].as_f64().unwrap_or(0.0), c[1].as_f64().unwrap_or(0.0));
-        length += f64::sqrt(dist.0*dist.0 + dist.1*dist.1);
-    }
-    let this_max = (MAX_POINTS_PER_PATH as f64 * length / 150.0) as i32 + 3;
-    if part.len() as i32 <= this_max {
+    if part.len() as i32 <= MAX_POINTS_PER_PATH {
         write_i32(file, part.len() as i32); // number of coordinates
         for coords in part.members() {
             // write coordinates as fixed point values
@@ -126,17 +118,22 @@ fn write_poly_part(file: &mut File, part: &json::JsonValue) {
             write_i32(file, lat_fixed);
         }
     } else {
-        let mut left = this_max;
+        let mut length = 0.0;
+        let mut last = (0.0, 0.0);
+        for c in part.members() {
+            let dist = (c[0].as_f64().unwrap_or(0.0) - last.0, c[1].as_f64().unwrap_or(0.0) - last.1);
+            last = (c[0].as_f64().unwrap_or(0.0), c[1].as_f64().unwrap_or(0.0));
+            length += f64::sqrt(dist.0*dist.0 + dist.1*dist.1);
+        }
         let mut skip: f64 = 0.0;
         let filtered_coords: Vec<&json::JsonValue> = part.members().filter(
             |&c| {
-                skip += this_max as f64 / (part.len() as i32) as f64;
+                skip += MAX_POINTS_PER_PATH as f64 / (part.len() as i32) as f64;
                 let dist = (c[0].as_f64().unwrap_or(0.0) - last.0, c[1].as_f64().unwrap_or(0.0) - last.1);
-                if skip >= 1.0 || (dist.0*dist.0 + dist.1*dist.1) > length / this_max as f64 * 10.0 {
+                if skip >= 1.0 || (dist.0*dist.0 + dist.1*dist.1) > (length / MAX_POINTS_PER_PATH as f64) {
                     last = (c[0].as_f64().unwrap_or(0.0), c[1].as_f64().unwrap_or(0.0));
                     skip -= 1.0;
-                    left -= 1;
-                    return left >= 0;
+                    return true;
                 } else {
                     return false;
                 }
