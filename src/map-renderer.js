@@ -284,24 +284,21 @@ class MapRenderer extends LitElement {
             if (!info_box.current_location !== location) {
                 const name = this.shadowRoot.getElementById('info-box-name');
                 const map_wrapper = this.shadowRoot.getElementById('map-wrapper');
+                name.innerText = location.name.split(',')[0];
+                Array.from(info_box.getElementsByClassName('info-field-value')).forEach((el, i) => {
+                    el.innerText = Math.round(location.data[i] * 100) / 100;
+                });
                 const elem_pos = elem.getBoundingClientRect();
                 const map_wrapper_pos = map_wrapper.getBoundingClientRect();
                 const x = elem_pos.x - map_wrapper_pos.x + elem_pos.width / 2;
                 const y = elem_pos.y - map_wrapper_pos.y + elem_pos.height / 2;
                 info_box.style.left = x + 'px';
                 info_box.style.top = y + 'px';
+                info_box.classList.add('visible');
                 info_box.style.setProperty('--anchor-point', (x / map_wrapper.clientWidth * 90 + 5) + '%');
                 info_box.style.setProperty('--anchor-at-bottom', (y > ((info_box.clientHeight + 12) * 1.2)) ? 1 : 0);
-                name.innerText = location.name.split(',')[0];
-                Array.from(info_box.getElementsByClassName('info-field-value')).forEach((el, i) => {
-                    el.innerText = Math.round(location.data[i] * 100) / 100;
-                });
-                info_box.classList.add('visible');
                 info_box.current_location = location;
             }
-        } else {
-            info_box.classList.remove('visible');
-            info_box.current_location = null;
         }
     }
     
