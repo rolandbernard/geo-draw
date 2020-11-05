@@ -11,7 +11,7 @@ class MapDataInput extends LitElement {
 
     static get properties() {
         return {
-            data: {type: Object},
+            data: {type: Object, hasChanged: (n, o) => n?.id !== o?.id},
         };
     }
 
@@ -130,7 +130,6 @@ class MapDataInput extends LitElement {
 
     updateColor(col_index, value) {
         const color_with = this.data.color_using;
-        console.log(value);
         if(value) {
             const entry = color_with.findIndex(el => el === col_index);
             if(entry === -1) {
@@ -141,18 +140,17 @@ class MapDataInput extends LitElement {
                 this.data.colors[entry] = value;
             }
         } else {
-            console.log(this.data.color_using);
             color_with.forEach((index, i) => {
                 if(index === col_index) {
                     this.data.color_using.splice(i, 1);
                     this.data.colors.splice(i, 1);
                 }
             });
-            console.log(this.data.color_using);
         }
         this.dispatchOnChange({
             ...this.data,
         });
+        this.requestUpdate();
     }
    
     addColumn() {
@@ -163,6 +161,7 @@ class MapDataInput extends LitElement {
         this.dispatchOnChange({
             ...this.data,
         });
+        this.requestUpdate();
     }
     
     removeColumn(index) {
@@ -181,6 +180,7 @@ class MapDataInput extends LitElement {
         this.dispatchOnChange({
             ...this.data,
         });
+        this.requestUpdate();
     }
 
     addRow() {
@@ -189,6 +189,7 @@ class MapDataInput extends LitElement {
         this.dispatchOnChange({
             ...this.data,
         });
+        this.requestUpdate();
     }
 
     removeRow(index) {
@@ -197,6 +198,7 @@ class MapDataInput extends LitElement {
         this.dispatchOnChange({
             ...this.data,
         });
+        this.requestUpdate();
     }
 
     updateTitle(title) {

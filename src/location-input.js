@@ -30,6 +30,7 @@ class LocationInput extends LitElement {
                 box-shadow: var(--shadow-small);
                 scrollbar-width: none;
                 z-index: 1000;
+                pointer-events: none;
             }
             input.input-element:focus ~ div.autocomplete {
                 display: block;
@@ -103,9 +104,13 @@ class LocationInput extends LitElement {
             this.selected = (this.selected + 1) % this.complete.length;
             event.preventDefault();
         } else if(event.key === 'Enter') {
-            const event = new Event('change');
-            event.location = this.complete[this.selected].id;
-            this.dispatchEvent(event);
+            const location = this.complete[this.selected].id;
+            if(location) {
+                const event = new Event('change');
+                event.location = location;
+                this.value = location;
+                this.dispatchEvent(event);
+            }
         }
     }
 

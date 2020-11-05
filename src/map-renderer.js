@@ -375,7 +375,7 @@ class MapRenderer extends LitElement {
                 let colors;
                 if (color_data?.[0]?.length > 0) {
                     const max_data = color_data.reduce((a, b) => a.map((el, i) => Math.max(el, b[i])));
-                    const min_data = color_data.reduce((a, b) => a.map((el, i) => 0 /*Math.min(el, b[i])*/));
+                    const min_data = color_data.reduce((a, b) => a.map((el, i) => Math.min(el, b[i])));
                     colors = color_data.map(data_vec => {
                         if (data_vec.length == 1) {
                             const color = MapRenderer.parseColor(data.colors[0]);
@@ -397,7 +397,7 @@ class MapRenderer extends LitElement {
                 }
                 const min = locations.filter(loc => loc).map(loc => loc.min).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]);
                 const max = locations.filter(loc => loc).map(loc => loc.max).reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]);
-                const data_min = color_data.reduce((a, b) => a.map((el, i) => 0 /*Math.min(el, b[i])*/));
+                const data_min = color_data.reduce((a, b) => a.map((el, i) => Math.min(el, b[i])));
                 const data_max = color_data.reduce((a, b) => a.map((el, i) => Math.max(el, b[i])));
                 return html`
                     <div id="map-wrapper">
