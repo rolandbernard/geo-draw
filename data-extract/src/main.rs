@@ -84,9 +84,9 @@ fn write_i32(file: &mut File, value: i32) {
     ]).unwrap();
 }
 
-const MAX_POINTS_PER_PATH: i32 = 256;
+const MAX_POINTS_PER_PATH: i32 = 512;
 const MAX_POLY_PARTS: i32 = 4;
-const MAX_POLYGONS: i32 = 4;
+const MAX_POLYGONS: i32 = 16;
 
 fn cross_product(x: &(f64, f64), y: &(f64, f64)) -> f64 {
     return (x.0 * y.0) - (x.1 * y.0);
@@ -118,12 +118,21 @@ fn write_poly_part(file: &mut File, part: &json::JsonValue) {
             write_i32(file, lat_fixed);
         }
     } else {
+        let mut length = 0.0;
+        let mut last = (0.0, 0.0);
+        for c in part.members() {
+            let dist = (c[0].as_f64().unwrap_or(0.0) - last.0, c[1].as_f64().unwrap_or(0.0) - last.1);
+            last = (c[0].as_f64().unwrap_or(0.0), c[1].as_f64().unwrap_or(0.0));
+            length += f64::sqrt(dist.0*dist.0 + dist.1*dist.1);
+        }
         let mut left = MAX_POINTS_PER_PATH;
         let mut skip: f64 = 0.0;
         let filtered_coords: Vec<&json::JsonValue> = part.members().filter(
-            |&_| {
+            |&c| {
                 skip += MAX_POINTS_PER_PATH as f64 / (part.len() as i32) as f64;
-                if skip >= 1.0 {
+                let dist = (c[0].as_f64().unwrap_or(0.0) - last.0, c[1].as_f64().unwrap_or(0.0) - last.1);
+                if skip >= 1.0 || (dist.0*dist.0 + dist.1*dist.1) > length / MAX_POINTS_PER_PATH as f64 * 2.0 {
+                    last = (c[0].as_f64().unwrap_or(0.0), c[1].as_f64().unwrap_or(0.0));
                     skip -= 1.0;
                     left -= 1;
                     return left >= 0;
@@ -189,6 +198,35 @@ fn write_to_file(id: &str, name: &str, geom: &json::JsonValue) {
                 write_polygon(&mut file, poly);
             }
         }
+    } else if geom["type"] == "GeometryCollection"  {
+        let mut polys: Vec<&json::JsonValue> = Vec::new();
+        for geo in geom["geometries"].members() {
+            if geo["type"] == "Polygon" {
+                polys.push(&geo["coordinates"]);
+            } else if geo["type"] == "MultiPolygon" {
+                for pol in geo["coordinates"].members() {
+                    polys.push(pol);
+                }
+            }
+        }
+        let mut file = File::create(format!("../static/data/{}.bin", id)).unwrap();
+        file.write_all(name.as_bytes()).unwrap();
+        file.write_all(&[0]).unwrap();
+        if polys.len() as i32 <= MAX_POLYGONS {
+            write_i32(&mut file, polys.len() as i32); // number of polygons
+            for poly in polys {
+                write_polygon(&mut file, poly);
+            }
+        } else {
+            // write the polygons with the biggest outline
+            polys.sort_by_key(|&x| -polygon_outer_size(&x[0]));
+            write_i32(&mut file, MAX_POLYGONS); // number of polygons
+            for poly in polys.iter().take(MAX_POLYGONS as usize) {
+                write_polygon(&mut file, poly);
+            }
+        }
+    } else {
+        println!("Different geometry type: {:?}", geom["type"]);
     }
 }
 
@@ -200,25 +238,31 @@ fn generate_data(
 ) {
     if geojson["type"] == "FeatureCollection" {
         for features in geojson["features"].members() {
-            if !features["properties"]["shapeID"].is_null() {
-                // Data exported from geoboundaries.org
-                let id = features["properties"]["shapeID"].as_str().unwrap_or("").to_string();
-                let parents = features["properties"]["ADMHIERACHY"].as_str().unwrap_or(&id).split(",");
-                let name = generate_name(locations, parents.clone(), false);
-                let frag_name = generate_name(locations, parents, true);
-                generate_fragments(fragments, id.to_string(), &frag_name);
-                names.insert(id.to_string(), name.clone());
-                write_to_file(&id, &name, &features["geometry"]);
-            } else if !features["properties"]["id"].is_null() {
-                let id = features["properties"]["id"].as_i32().unwrap().to_string();
-                // Data exported from OpenStreetMap
-                let parents = format!("{},{}", id, features["properties"]["parents"].as_str().unwrap_or(""));
-                let split_parents = parents.split(",");
-                let name = generate_name(locations, split_parents.clone(), false);
-                let frag_name = generate_name(locations, split_parents, true);
-                generate_fragments(fragments, id.to_string(), &frag_name);
-                names.insert(id.to_string(), name.clone());
-                write_to_file(&id, &name, &features["geometry"]);
+            if features["type"] == "Feature" {
+                if !features["properties"]["shapeID"].is_null() {
+                    // Data exported from geoboundaries.org
+                    let id = features["properties"]["shapeID"].as_str().unwrap_or("").to_string();
+                    let parents = features["properties"]["ADMHIERACHY"].as_str().unwrap_or(&id).split(",");
+                    let name = generate_name(locations, parents.clone(), false);
+                    let frag_name = generate_name(locations, parents, true);
+                    generate_fragments(fragments, id.to_string(), &frag_name);
+                    names.insert(id.to_string(), name.clone());
+                    write_to_file(&id, &name, &features["geometry"]);
+                } else if !features["properties"]["id"].is_null() {
+                    let id = features["properties"]["id"].as_i32().unwrap().to_string();
+                    // Data exported from OpenStreetMap
+                    let parents = format!("{},{}", id, features["properties"]["parents"].as_str().unwrap_or(""));
+                    let split_parents = parents.split(",");
+                    let name = generate_name(locations, split_parents.clone(), false);
+                    let frag_name = generate_name(locations, split_parents, true);
+                    generate_fragments(fragments, id.to_string(), &frag_name);
+                    names.insert(id.to_string(), name.clone());
+                    write_to_file(&id, &name, &features["geometry"]);
+                } else {
+                    println!("Id can't be found");
+                }
+            } else {
+                println!("Not a feature: {:?}", features["type"]);
             }
         }
     }
