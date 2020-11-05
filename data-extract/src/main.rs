@@ -102,11 +102,19 @@ fn polygon_outer_size(poly: &json::JsonValue) -> i64 {
         }
         last_coords = coord;
     }
-    return (f64::abs(ret) * 1_000_000_000.0) as i64;
+    return (f64::abs(ret) * 1_000_000.0) as i64;
 }
 
 fn write_poly_part(file: &mut File, part: &json::JsonValue) {
-    if part.len() as i32 <= MAX_POINTS_PER_PATH {
+    let mut length = 0.0;
+    let mut last = (0.0, 0.0);
+    for c in part.members() {
+        let dist = (c[0].as_f64().unwrap_or(0.0) - last.0, c[1].as_f64().unwrap_or(0.0) - last.1);
+        last = (c[0].as_f64().unwrap_or(0.0), c[1].as_f64().unwrap_or(0.0));
+        length += f64::sqrt(dist.0*dist.0 + dist.1*dist.1);
+    }
+    let this_max = (MAX_POINTS_PER_PATH as f64 * length / 150.0) as i32 + 3;
+    if part.len() as i32 <= this_max {
         write_i32(file, part.len() as i32); // number of coordinates
         for coords in part.members() {
             // write coordinates as fixed point values
@@ -118,20 +126,13 @@ fn write_poly_part(file: &mut File, part: &json::JsonValue) {
             write_i32(file, lat_fixed);
         }
     } else {
-        let mut length = 0.0;
-        let mut last = (0.0, 0.0);
-        for c in part.members() {
-            let dist = (c[0].as_f64().unwrap_or(0.0) - last.0, c[1].as_f64().unwrap_or(0.0) - last.1);
-            last = (c[0].as_f64().unwrap_or(0.0), c[1].as_f64().unwrap_or(0.0));
-            length += f64::sqrt(dist.0*dist.0 + dist.1*dist.1);
-        }
-        let mut left = MAX_POINTS_PER_PATH;
+        let mut left = this_max;
         let mut skip: f64 = 0.0;
         let filtered_coords: Vec<&json::JsonValue> = part.members().filter(
             |&c| {
-                skip += MAX_POINTS_PER_PATH as f64 / (part.len() as i32) as f64;
+                skip += this_max as f64 / (part.len() as i32) as f64;
                 let dist = (c[0].as_f64().unwrap_or(0.0) - last.0, c[1].as_f64().unwrap_or(0.0) - last.1);
-                if skip >= 1.0 || (dist.0*dist.0 + dist.1*dist.1) > length / MAX_POINTS_PER_PATH as f64 * 2.0 {
+                if skip >= 1.0 || (dist.0*dist.0 + dist.1*dist.1) > length / this_max as f64 * 10.0 {
                     last = (c[0].as_f64().unwrap_or(0.0), c[1].as_f64().unwrap_or(0.0));
                     skip -= 1.0;
                     left -= 1;
