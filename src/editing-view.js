@@ -1,5 +1,6 @@
 
 import { css, html, LitElement } from 'lit-element'
+import { unsafeHTML } from 'lit-html/directives/unsafe-html';
 
 import './map-renderer';
 import './map-data-input';
@@ -31,7 +32,7 @@ class EditingView extends LitElement {
                 flex: 0 0 auto;
                 z-index: 100;
             }
-            header img {
+            header svg {
                 width: 2rem;
                 height: 2rem;
                 pointer-events: none;
@@ -127,7 +128,7 @@ class EditingView extends LitElement {
     render() {
         return html`
             <div class="editing-view-root">
-                <header><img src="${Icon}"/><span>Geo-Draw</span></header>
+                <header>${unsafeHTML(Icon)}<span>Geo-Draw</span></header>
                 <div class="content-root">
                     <div class="editing">
                         <map-data-input
