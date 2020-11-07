@@ -340,17 +340,7 @@ class MapRenderer extends LitElement {
                                             .reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
                                         max: data.coords.reduce((a, b) => a.concat(b), []).reduce((a, b) => a.concat(b), [])
                                             .reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
-                                        svg: data.coords.map(poly => (
-                                            svg`<path d="${poly.map((part, i) => (
-                                                (i == 0 ? part : part.reverse())
-                                                    .map((coord, i) => (
-                                                        i == 0
-                                                            ? 'M ' + coord[0] + ',' + coord[1]
-                                                            : 'L ' + coord[0] + ',' + coord[1]
-                                                    )).join(' ') + ' z'
-                                            )).join(' ')
-                                                }"/>`
-                                        )),
+                                        coords: data.coords,
                                     };
                                 } else {
                                     location_cache[location] = null;
@@ -394,6 +384,22 @@ class MapRenderer extends LitElement {
                 }
                 const min = locations.filter(loc => loc).map(loc => loc.min).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]);
                 const max = locations.filter(loc => loc).map(loc => loc.max).reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]);
+                const total_diff = Math.max(max[0] - min[0], max[1] - min[1]);
+                locations.forEach(loc => {
+                    if(loc) {
+                        loc.svg = loc.coords.map(poly => (
+                            svg`<path d="${poly.map((part, i) => (
+                                (i == 0 ? part : part.reverse())
+                                    .map((coord, i) => (
+                                        i == 0
+                                            ? 'M ' + MapRenderer.map(coord[0], min[0], min[0] + total_diff, 0, 1000) + ',' + MapRenderer.map(coord[1], min[1], min[1] + total_diff, 0, 1000)
+                                            : 'L ' + MapRenderer.map(coord[0], min[0], min[0] + total_diff, 0, 1000) + ',' + MapRenderer.map(coord[1], min[1], min[1] + total_diff, 0, 1000)
+                                    )).join(' ') + ' z'
+                                )).join(' ')
+                            }"/>`
+                        ));
+                    }
+                });
                 const data_min = color_data.reduce((a, b) => a.map((el, i) => Math.min(el, b[i])));
                 const data_max = color_data.reduce((a, b) => a.map((el, i) => Math.max(el, b[i])));
                 return html`
@@ -414,7 +420,12 @@ class MapRenderer extends LitElement {
                         <svg
                             class="wrapping-svg"
                             xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
-                            viewBox="${min[0] + " " + min[1] + " " + (max[0] - min[0]) + " " + (max[1] - min[1])}"
+                            viewBox="${
+                                MapRenderer.map(min[0], min[0], min[0] + total_diff, 0, 1000) + ' ' + 
+                                MapRenderer.map(min[1], min[1], min[1] + total_diff, 0, 1000) + ' ' +
+                                MapRenderer.map(max[0], min[0], min[0] + total_diff, 0, 1000) + ' ' + 
+                                MapRenderer.map(max[1], min[1], min[1] + total_diff, 0, 1000)
+                            }"
                         >
                             <filter id="dropshadow" height="130%">
                               <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>

@@ -1,9 +1,13 @@
 
 import { css, html, LitElement } from 'lit-element'
 import { until } from 'lit-html/directives/until';
+import { unsafeHTML } from 'lit-html/directives/unsafe-html';
 
 import './ui/spinner';
 import './location-input';
+import AddIcon from './icons/add.svg';
+import DeleteIcon from './icons/delete.svg';
+import { classMap } from 'lit-html/directives/class-map';
 
 const data_location = './static/data/';
 
@@ -25,14 +29,20 @@ class MapDataInput extends LitElement {
                 color: black;
                 padding: 0.25rem;
             }
-            td.cell {
+            td.cell, td.header {
                 border-bottom: 1px solid var(--background-dark);
             }
-            td.header {
+            td.header span.location-header {
                 font-weight: 500;
-                border-bottom: 1px solid var(--background-dark);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                height: 2rem;
+                width: 15rem;
+                margin: 4px;
             }
             input {
+                flex: 1 1 auto;
                 box-sizing: border-box;
                 margin: 0;
                 font-family: inherit;
@@ -54,6 +64,83 @@ class MapDataInput extends LitElement {
                 display: flex;
                 align-items: center;
                 justify-content: center;
+            }
+            .add-button, .remove-button {
+                flex: 0 0 auto;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                border: none;
+                box-sizing: border-box;
+                background: var(--secondary);
+                color: white;
+                padding: 3px;
+                border-radius: 4px;
+                appearance: none;
+                user-select: none;
+                box-shadow: var(--shadow-small);
+                cursor: pointer;
+                margin: 4px;
+            }
+            .add-button svg, .remove-button svg {
+                width: 1.5rem;
+                height: 1.5rem;
+                fill: white;
+            }
+            .color-input {
+                flex: 0 0 auto;
+                display: block;
+                width: 1.5rem;
+                height: 1.5rem;
+                border: none;
+                box-sizing: content-box;
+                padding: 3px 3px;
+                border-radius: 4px;
+                appearance: none;
+                user-select: none;
+                background: var(--background-light);
+                box-shadow: var(--shadow-small);
+                cursor: pointer;
+                min-width: 0;
+                min-height: 0;
+                margin: 4px;
+            }
+            .color-input.disabled {
+                filter: blur(1px);
+            }
+            .color-checkbox {
+                flex: 0 0 auto;
+                width: min-content;
+                height: min-content;
+                min-width: 0;
+                min-height: 0;
+                display: block;
+                margin: 4px;
+            }
+            .title-input-wrap, .defcolor-input-wrap, .data-input-wrap, .location-cell {
+                display: flex;
+                align-items: center;
+            }
+            .title-input-wrap, .defcolor-input-wrap {
+                margin: 0.25rem;
+            }
+            .title-input-wrap {
+                margin-top: 0.5rem;
+            }
+            .title-input-wrap span.title, .defcolor-input-wrap span.defcolor {
+                margin: 4px;
+            }
+            input.text-field, input.text-field {
+                display: block;
+                height: calc(1.5rem + 6px);
+                appearance: none;
+                border-radius: 4px;
+                padding: 3px 6px;
+                border: 1px solid var(--secondary);
+                font-weight: 400;
+                font-family: Roboto, sans-serif;
+                font-size: 0.9rem;
+                color: black;
             }
         `;
     }
@@ -220,37 +307,41 @@ class MapDataInput extends LitElement {
             <div class="map-input-root">
                 ${until((async () => {
                     const index = await this.index;
-                    const { names } = index;
                     return html`
                         <div>
-                            <span><span>Title:</span><input
+                            <span class="title-input-wrap"><span class="title">Title:</span><input
+                                class="text-field"
                                 value="${this.data.title}"
                                 @change="${e => this.updateTitle(e.target.value)}"
                             /></span>
-                            <span><span>Default color:</span><input
+                            <span class="defcolor-input-wrap"><span class="defcolor">Default color:</span><input
+                                class="color-input"
                                 type="color"
                                 value="${this.data.defcolor}"
                                 @change="${e => this.updateDefaultColor(e.target.value)}"
                             /></span>
                         </div>
                         <table>
-                            <tr><td class="header">Locations</td>${this.data.columns.map((col, i) => (html`
-                                <td class="header">
+                            <tr><td class="header"><span class="location-header">Locations</span></td>${this.data.columns.map((col, i) => (html`
+                                <td class="header"><div class="data-input-wrap">
                                     <button
+                                        class="remove-button"
                                         @click="${() => this.removeColumn(i)}"
-                                    >Remove</button>
+                                    >${unsafeHTML(DeleteIcon)}</button>
                                     <input
+                                        class="text-field"
                                         value="${col}"
                                         @change="${e => this.updateColumn(i, e.target.value)}"
                                     />
                                     <input
-                                        class="color-input"
+                                        class="${classMap({'color-input': true, 'disabled': this.data.color_using?.findIndex(u => u === i) !== -1 ? false : true})}"
                                         key="${i}"
                                         type="color"
                                         value="${this.data.colors?.[this.data.color_using?.map((u, i) => [u, i])?.find(([u]) => u === i)?.[1]]}"
                                         @change="${e => this.updateColor(i, e.target.value)}"
                                     />  
                                     <input
+                                        class="color-checkbox"
                                         type="checkbox"
                                         ?checked="${this.data.color_using?.findIndex(u => u === i) !== -1 ? true : false}"
                                         @change="${e => {
@@ -264,27 +355,32 @@ class MapDataInput extends LitElement {
                                             }
                                         }}"
                                     />  
-                                </td>
+                                </div></td>
                             `))}<td>
                                 <button
+                                    class="add-button"
                                     @click="${this.addColumn}"
-                                >Add</button>
+                                >${unsafeHTML(AddIcon)}</button>
                             </td></tr>
                             ${this.data.locations.map((loc, i) => (html`
                                 <tr>
                                     <td class="cell">
-                                        <button
-                                            @click="${() => this.removeRow(i)}"
-                                        >Remove</button>
-                                        <location-input
-                                            value="${loc}"
-                                            .index="${index}"
-                                            @change="${e => this.updateLocation(i, e.location)}"
-                                        ></location-input>
+                                        <div class="location-cell">
+                                            <button
+                                                class="remove-button"
+                                                @click="${() => this.removeRow(i)}"
+                                            >${unsafeHTML(DeleteIcon)}</button>
+                                            <location-input
+                                                value="${loc}"
+                                                .index="${index}"
+                                                @change="${e => this.updateLocation(i, e.location)}"
+                                            ></location-input>
+                                        </div>
                                     </td>
                                     ${this.data.data[i]?.map((data, j) => (html`
                                         <td class="cell">
                                             <input
+                                                class="text-field"
                                                 value="${data}"
                                                 type="number"
                                                 @change="${e => this.updateData(i, j, e.target.value)}"
@@ -295,8 +391,9 @@ class MapDataInput extends LitElement {
                             `))}
                             <tr><td>
                                 <button
+                                    class="add-button"
                                     @click="${this.addRow}"
-                                >Add</button>
+                                >${unsafeHTML(AddIcon)}</button>
                             </td></tr>
                         </table>
                     `;

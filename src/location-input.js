@@ -16,8 +16,12 @@ class LocationInput extends LitElement {
     
     static get styles() {
         return css`
+            :host {
+                width: 100%;
+            }
             div.location-input-root {
                 position: relative;
+                width: 100%;
             }
             div.autocomplete {
                 display: none;
@@ -34,6 +38,21 @@ class LocationInput extends LitElement {
             }
             input.input-element:focus ~ div.autocomplete {
                 display: block;
+            }
+            input.input-element {
+                display: block;
+                height: calc(1.5rem + 6px);
+                appearance: none;
+                border-radius: 4px;
+                padding: 3px 6px;
+                border: 1px solid var(--secondary);
+                font-weight: 400;
+                font-family: Roboto, sans-serif;
+                font-size: 0.9rem;
+                color: black;
+                box-sizing: border-box;
+                margin: 0;
+                width: 100%;
             }
             div.complete {
                 box-sizing: border-box;
@@ -87,12 +106,14 @@ class LocationInput extends LitElement {
         }
         this.selected = 0;
     }
-
+    
     onKeypress(event) {
-        const value = event.target.value;
-        if(value !== this.string_value) {
-            this.string_value = value;
-            this.updateAutocomplete();
+        if(event.key !== 'Enter') {
+            const value = event.target.value;
+            if(value !== this.string_value) {
+                this.string_value = value;
+                this.updateAutocomplete();
+            }
         }
     }
     
@@ -104,6 +125,7 @@ class LocationInput extends LitElement {
             this.selected = (this.selected + 1) % this.complete.length;
             event.preventDefault();
         } else if(event.key === 'Enter') {
+            event.target.blur();
             const location = this.complete[this.selected].id;
             if(location) {
                 const event = new Event('change');
@@ -137,7 +159,7 @@ class LocationInput extends LitElement {
             <div class="location-input-root">
                 <input
                     class="input-element"
-                    value="${this.string_value}"
+                    .value="${this.string_value}"
                     @keyup="${this.onKeypress}"
                     @keydown="${this.onKeydown}"
                     @focusout="${this.onFocus}"
