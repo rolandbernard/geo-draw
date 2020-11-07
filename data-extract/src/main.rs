@@ -125,13 +125,14 @@ fn write_poly_part(file: &mut File, part: &json::JsonValue) {
             length += f64::sqrt(dist.0*dist.0 + dist.1*dist.1);
             last = (c[0].as_f64().unwrap_or(0.0), c[1].as_f64().unwrap_or(0.0));
         }
-        last = (0.0, 0.0);
+        let mut skip: f64 = 0.0;
         let filtered_coords: Vec<&json::JsonValue> = part.members().filter(
             |&c| {
                 let dist = (c[0].as_f64().unwrap_or(0.0) - last.0, c[1].as_f64().unwrap_or(0.0) - last.1);
-                if last == (0.0, 0.0)
-                    || (dist.0*dist.0 + dist.1*dist.1) > (length / MAX_POINTS_PER_PATH as f64)*(length / MAX_POINTS_PER_PATH as f64) {
-                    last = (c[0].as_f64().unwrap_or(0.0), c[1].as_f64().unwrap_or(0.0));
+                skip += f64::sqrt(dist.0*dist.0 + dist.1*dist.1) * MAX_POINTS_PER_PATH as f64 / length;
+                last = (c[0].as_f64().unwrap_or(0.0), c[1].as_f64().unwrap_or(0.0));
+                if skip >= 1.0 {
+                    skip -= 1.0;
                     return true;
                 } else {
                     return false;
