@@ -84,7 +84,7 @@ fn write_i32(file: &mut File, value: i32) {
     ]).unwrap();
 }
 
-const MAX_POINTS_PER_PATH: i32 = 512;
+const MAX_POINTS_PER_PATH: i32 = 256;
 const MAX_POLY_PARTS: i32 = 16;
 const MAX_POLYGONS: i32 = 16;
 
@@ -119,20 +119,19 @@ fn write_poly_part(file: &mut File, part: &json::JsonValue) {
         }
     } else {
         let mut length = 0.0;
-        let mut last = (0.0, 0.0);
+        let mut last = (part[part.len() - 1][0].as_f64().unwrap_or(0.0), part[part.len() - 1][1].as_f64().unwrap_or(0.0));
         for c in part.members() {
             let dist = (c[0].as_f64().unwrap_or(0.0) - last.0, c[1].as_f64().unwrap_or(0.0) - last.1);
-            last = (c[0].as_f64().unwrap_or(0.0), c[1].as_f64().unwrap_or(0.0));
             length += f64::sqrt(dist.0*dist.0 + dist.1*dist.1);
+            last = (c[0].as_f64().unwrap_or(0.0), c[1].as_f64().unwrap_or(0.0));
         }
-        let mut skip: f64 = 0.0;
+        last = (0.0, 0.0);
         let filtered_coords: Vec<&json::JsonValue> = part.members().filter(
             |&c| {
-                skip += MAX_POINTS_PER_PATH as f64 / (part.len() as i32) as f64;
                 let dist = (c[0].as_f64().unwrap_or(0.0) - last.0, c[1].as_f64().unwrap_or(0.0) - last.1);
-                if skip >= 1.0 || (dist.0*dist.0 + dist.1*dist.1) > (length / MAX_POINTS_PER_PATH as f64) {
+                if last == (0.0, 0.0)
+                    || (dist.0*dist.0 + dist.1*dist.1) > (length / MAX_POINTS_PER_PATH as f64)*(length / MAX_POINTS_PER_PATH as f64) {
                     last = (c[0].as_f64().unwrap_or(0.0), c[1].as_f64().unwrap_or(0.0));
-                    skip -= 1.0;
                     return true;
                 } else {
                     return false;
