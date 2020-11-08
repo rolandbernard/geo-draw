@@ -44,12 +44,23 @@ class MapRenderer extends LitElement {
                 stroke-width: 0.25%;
                 stroke-linejoin: round;
                 stroke-linecap: round;
+                width: 100%;
+                height: 100%;
+                max-width: 100%;
+                max-height: 100%;
+                display: block;
+                position: absolute;
+            }
+            svg.shadow-svg {
+                fill: black;
                 filter: url(#dropshadow);
                 width: 100%;
                 height: 100%;
                 max-width: 100%;
                 max-height: 100%;
                 display: block;
+                position: absolute;
+                pointer-events: none;
             }
             svg.wrapping-svg g:hover {
                 fill-opacity: 0.75;
@@ -385,6 +396,7 @@ class MapRenderer extends LitElement {
                 const min = locations.filter(loc => loc).map(loc => loc.min).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]);
                 const max = locations.filter(loc => loc).map(loc => loc.max).reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]);
                 const total_diff = Math.max(max[0] - min[0], max[1] - min[1]);
+                const max_size = Math.max(window.innerWidth, window.innerHeight);
                 locations.forEach(loc => {
                     if(loc) {
                         loc.svg = loc.coords.map(poly => (
@@ -392,8 +404,8 @@ class MapRenderer extends LitElement {
                                 (i == 0 ? part : part.reverse())
                                     .map((coord, i) => (
                                         i == 0
-                                            ? 'M ' + MapRenderer.map(coord[0], min[0], min[0] + total_diff, 0, 1000) + ',' + MapRenderer.map(coord[1], min[1], min[1] + total_diff, 0, 1000)
-                                            : 'L ' + MapRenderer.map(coord[0], min[0], min[0] + total_diff, 0, 1000) + ',' + MapRenderer.map(coord[1], min[1], min[1] + total_diff, 0, 1000)
+                                            ? 'M ' + MapRenderer.map(coord[0], min[0], min[0] + total_diff, 0, max_size) + ',' + MapRenderer.map(coord[1], min[1], min[1] + total_diff, 0, max_size)
+                                            : 'L ' + MapRenderer.map(coord[0], min[0], min[0] + total_diff, 0, max_size) + ',' + MapRenderer.map(coord[1], min[1], min[1] + total_diff, 0, max_size)
                                     )).join(' ') + ' z'
                                 )).join(' ')
                             }"/>`
@@ -418,26 +430,34 @@ class MapRenderer extends LitElement {
                             </div>
                         </div>
                         <svg
-                            class="wrapping-svg"
-                            xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+                            class="shadow-svg"
                             viewBox="${
-                                MapRenderer.map(min[0], min[0], min[0] + total_diff, 0, 1000) + ' ' + 
-                                MapRenderer.map(min[1], min[1], min[1] + total_diff, 0, 1000) + ' ' +
-                                MapRenderer.map(max[0], min[0], min[0] + total_diff, 0, 1000) + ' ' + 
-                                MapRenderer.map(max[1], min[1], min[1] + total_diff, 0, 1000)
+                                MapRenderer.map(min[0], min[0], min[0] + total_diff, 0, max_size) + ' ' + 
+                                MapRenderer.map(min[1], min[1], min[1] + total_diff, 0, max_size) + ' ' +
+                                MapRenderer.map(max[0], min[0], min[0] + total_diff, 0, max_size) + ' ' + 
+                                MapRenderer.map(max[1], min[1], min[1] + total_diff, 0, max_size)
                             }"
                         >
                             <filter id="dropshadow" height="130%">
-                              <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+                              <feGaussianBlur in="SourceAlpha" stdDeviation="5"/>
                               <feOffset dx="2" dy="2" result="offsetblur"/>
                               <feComponentTransfer>
-                                <feFuncA type="linear" slope="0.25"/>
+                                <feFuncA type="linear" slope="0.5"/>
                               </feComponentTransfer>
-                              <feMerge> 
-                                <feMergeNode/>
-                                <feMergeNode in="SourceGraphic"/>
-                              </feMerge>
                             </filter>
+                            ${locations.map((loc, i) => (svg`
+                                <g>${loc?.svg}</g>
+                            `))}
+                        </svg>
+                        <svg
+                            class="wrapping-svg"
+                            viewBox="${
+                                MapRenderer.map(min[0], min[0], min[0] + total_diff, 0, max_size) + ' ' + 
+                                MapRenderer.map(min[1], min[1], min[1] + total_diff, 0, max_size) + ' ' +
+                                MapRenderer.map(max[0], min[0], min[0] + total_diff, 0, max_size) + ' ' + 
+                                MapRenderer.map(max[1], min[1], min[1] + total_diff, 0, max_size)
+                            }"
+                        >
                             ${locations.map((loc, i) => (svg`
                                 <g class="geometry" style="${styleMap({
                                     fill: `rgb(${colors[i][0]},${colors[i][1]},${colors[i][2]})`,
