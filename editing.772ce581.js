@@ -12,7 +12,7 @@
  * subject to an additional IP rights grant found at
  * http://polymer.github.io/PATENTS.txt
  */
-const w=new WeakMap,x=Object(b.d)(t=>n=>{if(!(n instanceof b.b))throw new Error("unsafeHTML can only be used in text bindings");const e=w.get(n);if(void 0!==e&&Object(y.h)(t)&&t===e.value&&n.value===e.fragment)return;const r=document.createElement("template");r.innerHTML=t;const a=document.importNode(r.content,!0);n.setValue(a),w.set(n,{value:t,fragment:a})});e(24);var k=e(29),O=e.n(k),j=e(26),R=e.n(j),_=e(25),C=e.n(_),E=e(27),D=e.n(E),S=e(21),z=(e(28),e(41)),A=e.n(z);
+const w=new WeakMap,x=Object(b.d)(t=>n=>{if(!(n instanceof b.b))throw new Error("unsafeHTML can only be used in text bindings");const e=w.get(n);if(void 0!==e&&Object(y.h)(t)&&t===e.value&&n.value===e.fragment)return;const r=document.createElement("template");r.innerHTML=t;const a=document.importNode(r.content,!0);n.setValue(a),w.set(n,{value:t,fragment:a})});e(24);var k=e(29),O=e.n(k),j=e(27),R=e.n(j),_=e(25),C=e.n(_),E=e(26),D=e.n(E),S=e(21),z=(e(28),e(41)),A=e.n(z);
 /**
  * @license
  * Copyright (c) 2018 The Polymer Project Authors. All rights reserved.
