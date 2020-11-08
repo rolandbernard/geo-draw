@@ -8,6 +8,9 @@ import './ui/spinner';
 const data_location = './static/data/';
 const location_cache = {};
 
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 30;
+
 class MapRenderer extends LitElement {
 
     static get properties() {
@@ -62,6 +65,13 @@ class MapRenderer extends LitElement {
                 position: absolute;
                 pointer-events: none;
             }
+            #map {
+                width: 100%;
+                height: 100%;
+                max-width: 100%;
+                max-height: 100%;
+                will-change: transform;
+            }
             svg.wrapping-svg g:hover {
                 fill-opacity: 0.75;
             }
@@ -72,6 +82,7 @@ class MapRenderer extends LitElement {
                 max-width: 100%;
                 max-height: 100%;
                 display: block;
+                will-change: cursor;
             }
             div#info-box-wrapper {
                 --anchor-point: 50%;
@@ -85,6 +96,7 @@ class MapRenderer extends LitElement {
                     calc(var(--anchor-at-bottom) * (-100% - 8.5px) + (1 - var(--anchor-at-bottom)) * 8.5px));
                 display: none;
                 pointer-events: none;
+                will-change: transform, top, left;
             }
             div#info-box-wrapper.visible {
                 display: block;
@@ -98,7 +110,7 @@ class MapRenderer extends LitElement {
                 width: max-content;
                 height: max-content;
                 max-width: 15rem;
-                min-width: 150px;
+                min-width: 200px;
                 width: 100%;
             }
             div#info-box-name {
@@ -284,6 +296,12 @@ class MapRenderer extends LitElement {
         return Math.log10(99 * prop + 1) / 2;
     }
     
+    constructor() {
+        super();
+        this.zoom_scale = 1;
+        this.zoom_center = [0, 0];
+    }
+
     mouseMoveCallback(event) {
         let elem = event.target;
         if(elem?.tagName === 'path') {
@@ -301,15 +319,19 @@ class MapRenderer extends LitElement {
                 });
                 const elem_pos = elem.getBoundingClientRect();
                 const map_wrapper_pos = map_wrapper.getBoundingClientRect();
-                const x = elem_pos.x - map_wrapper_pos.x + elem_pos.width / 2;
-                const y = elem_pos.y - map_wrapper_pos.y + elem_pos.height / 2;
+                const x = Math.min(Math.max((elem_pos.x - map_wrapper_pos.x + elem_pos.width / 2), 12), map_wrapper_pos.width - 12);
+                const y = Math.min(Math.max((elem_pos.y - map_wrapper_pos.y + elem_pos.height / 2), 0), map_wrapper_pos.height);
                 info_box.style.left = x + 'px';
                 info_box.style.top = y + 'px';
                 info_box.classList.add('visible');
-                info_box.style.setProperty('--anchor-point', (x / map_wrapper.clientWidth * 90 + 5) + '%');
+                info_box.style.setProperty('--anchor-point', (x / map_wrapper_pos.width * 90 + 5) + '%');
                 info_box.style.setProperty('--anchor-at-bottom', (y > ((info_box.clientHeight + 12) * 1.2)) ? 1 : 0);
                 info_box.current_location = location;
             }
+        } else {
+            const info_box = this.shadowRoot.getElementById('info-box-wrapper');
+            info_box.classList.remove('visible');
+            info_box.current_location = null;
         }
     }
     
@@ -329,6 +351,107 @@ class MapRenderer extends LitElement {
         } else {
             return (value - min_in) / (max_in - min_in) * (max_out - min_out) + min_out;
         }
+    }
+
+    handleScroll(event) {
+        if(!this.zoom_scale) {
+        }
+        event.preventDefault();
+        let new_scale = this.zoom_scale;
+        if (event.deltaY < 0) {
+            new_scale *= MapRenderer.map(event.deltaY, 0, -10, 1.1, 1.5);
+        } else {
+            new_scale *= MapRenderer.map(event.deltaY, 0, 10, 0.8, 0.95);
+        }
+        new_scale = Math.min(Math.max(MIN_ZOOM, new_scale), MAX_ZOOM);
+        const ds = new_scale / this.zoom_scale;
+        const element = this.shadowRoot.getElementById('map');
+        const element_pos = element.getBoundingClientRect();
+        const pointer = [
+            (event.clientX - element_pos.x - element_pos.width / 2) / element_pos.width * 100,
+            (event.clientY - element_pos.y - element_pos.height / 2) / element_pos.height * 100
+        ];
+        const delta = [pointer[0] - this.zoom_center[0], pointer[1] - this.zoom_center[1]].map(el => el * (1 - 1 / ds));
+        const new_center = [this.zoom_center[0] + delta[0], this.zoom_center[1] + delta[1]];
+        this.zoom_scale = new_scale;
+        this.zoom_center = new_center.map(pos => Math.min(Math.max(pos, -50), 50));
+        element.style.transform = `scale(${this.zoom_scale}) translate(${-this.zoom_center[0]}%,${-this.zoom_center[1]}%)`;
+        this.mouseMoveCallback(event);
+    }
+
+    handleDragStart(event) {
+        const element_wrap = this.shadowRoot.getElementById('map-wrapper');
+        this.last_drag_pos = [event.clientX, event.clientY];
+        element_wrap.onmouseup = this.handleDragEnd.bind(this);
+        element_wrap.onmouseleave = this.handleDragEnd.bind(this);
+        element_wrap.onmousemove = this.handleDragMove.bind(this);
+        element_wrap.style.cursor = 'grabbing';
+    }
+
+    handleDragMove(event) {
+        const element = this.shadowRoot.getElementById('map');
+        const element_pos = element.getBoundingClientRect();
+        const diff = [event.clientX - this.last_drag_pos[0], event.clientY - this.last_drag_pos[1]];
+        this.last_drag_pos = [event.clientX, event.clientY];
+        this.zoom_center[0] -= diff[0] / element_pos.width * 100;
+        this.zoom_center[1] -= diff[1] / element_pos.height * 100;
+        this.zoom_center = this.zoom_center.map(pos => Math.min(Math.max(pos, -50), 50));
+        element.style.transform = `scale(${this.zoom_scale}) translate(${-this.zoom_center[0]}%,${-this.zoom_center[1]}%)`;
+    }
+
+    handleDragEnd() {
+        const element_wrap = this.shadowRoot.getElementById('map-wrapper');
+        element_wrap.onmouseup = null;
+        element_wrap.onmouseleave = null;
+        element_wrap.onmousemove = null;
+        element_wrap.style.cursor = null;
+    }
+
+    handleTouchStart(event) {
+        if(event.touches.length == 1) {
+            this.mouseMoveCallback(event);
+        } else {
+            this.mouseOutCallback();
+        }
+        if(event.touches.length == 2) {
+            const touch_array = [[event.touches[0].clientX, event.touches[0].clientY], [event.touches[1].clientX, event.touches[1].clientY]];
+            this.avg_touch_pos = [(touch_array[0][0] + touch_array[1][0]) / 2, (touch_array[0][1] + touch_array[1][1]) / 2]
+            const diff = [touch_array[0][0] - touch_array[1][0], touch_array[0][1] - touch_array[1][1]];
+            this.touch_dist = (diff[0]*diff[0] + diff[1]*diff[1]);
+        }
+        event.preventDefault();
+    }
+
+    handleTouchMove(event) {
+        if(event.touches.length == 2) {
+            const element = this.shadowRoot.getElementById('map');
+            const element_pos = element.getBoundingClientRect();
+            const touch_array = [[event.touches[0].clientX, event.touches[0].clientY], [event.touches[1].clientX, event.touches[1].clientY]];
+            const new_touch_pos = [(touch_array[0][0] + touch_array[1][0]) / 2, (touch_array[0][1] + touch_array[1][1]) / 2]
+            this.zoom_center[0] -= (new_touch_pos[0] - this.avg_touch_pos[0]) / element_pos.width * 100;
+            this.zoom_center[1] -= (new_touch_pos[1] - this.avg_touch_pos[1]) / element_pos.height * 100;
+
+            const diff = [touch_array[0][0] - touch_array[1][0], touch_array[0][1] - touch_array[1][1]];
+            const new_touch_dist = (diff[0]*diff[0] + diff[1]*diff[1]);
+            if(this.touch_dist !== 0 && new_touch_dist !== 0) {
+                let new_zoom_scale = this.zoom_scale * new_touch_dist / this.touch_dist;
+                new_zoom_scale = Math.min(Math.max(MIN_ZOOM, new_zoom_scale), MAX_ZOOM);
+                const ds = new_zoom_scale / this.zoom_scale;
+                const pointer = [
+                    (new_touch_pos[0] - element_pos.x - element_pos.width / 2) / element_pos.width * 100,
+                    (new_touch_pos[1] - element_pos.y - element_pos.height / 2) / element_pos.height * 100
+                ];
+                const delta = [pointer[0] - this.zoom_center[0], pointer[1] - this.zoom_center[1]].map(el => el * (1 - 1 / ds));
+                const new_center = [this.zoom_center[0] + delta[0], this.zoom_center[1] + delta[1]];
+                this.zoom_scale = new_zoom_scale;
+                this.zoom_center = new_center;
+            }
+            this.zoom_center = this.zoom_center.map(pos => Math.min(Math.max(pos, -50), 50));
+            this.avg_touch_pos = new_touch_pos;
+            this.touch_dist = new_touch_dist;
+            element.style.transform = `scale(${this.zoom_scale}) translate(${-this.zoom_center[0]}%,${-this.zoom_center[1]}%)`;
+        }
+        event.preventDefault();
     }
 
     async drawMap() {
@@ -415,7 +538,13 @@ class MapRenderer extends LitElement {
                 const data_min = color_data.reduce((a, b) => a.map((el, i) => Math.min(el, b[i])));
                 const data_max = color_data.reduce((a, b) => a.map((el, i) => Math.max(el, b[i])));
                 return html`
-                    <div id="map-wrapper">
+                    <div
+                        id="map-wrapper"
+                        @wheel="${this.handleScroll}"
+                        @mousedown="${this.handleDragStart}"
+                        @touchstart="${this.handleTouchStart}"
+                        @touchmove="${this.handleTouchMove}"
+                    >
                         <div id="info-box-wrapper">
                             <div id="info-box-background"></div>
                             <div id="info-box">
@@ -429,47 +558,48 @@ class MapRenderer extends LitElement {
                                 </div>
                             </div>
                         </div>
-                        <svg
-                            class="shadow-svg"
-                            viewBox="${
-                                MapRenderer.map(min[0], min[0], min[0] + total_diff, 0, max_size) + ' ' + 
-                                MapRenderer.map(min[1], min[1], min[1] + total_diff, 0, max_size) + ' ' +
-                                MapRenderer.map(max[0], min[0], min[0] + total_diff, 0, max_size) + ' ' + 
-                                MapRenderer.map(max[1], min[1], min[1] + total_diff, 0, max_size)
-                            }"
-                        >
-                            <filter id="dropshadow" height="130%">
-                              <feGaussianBlur in="SourceAlpha" stdDeviation="5"/>
-                              <feOffset dx="2" dy="2" result="offsetblur"/>
-                              <feComponentTransfer>
-                                <feFuncA type="linear" slope="0.5"/>
-                              </feComponentTransfer>
-                            </filter>
-                            ${locations.map((loc, i) => (svg`
-                                <g>${loc?.svg}</g>
-                            `))}
-                        </svg>
-                        <svg
-                            class="wrapping-svg"
-                            viewBox="${
-                                MapRenderer.map(min[0], min[0], min[0] + total_diff, 0, max_size) + ' ' + 
-                                MapRenderer.map(min[1], min[1], min[1] + total_diff, 0, max_size) + ' ' +
-                                MapRenderer.map(max[0], min[0], min[0] + total_diff, 0, max_size) + ' ' + 
-                                MapRenderer.map(max[1], min[1], min[1] + total_diff, 0, max_size)
-                            }"
-                        >
-                            ${locations.map((loc, i) => (svg`
-                                <g class="geometry" style="${styleMap({
-                                    fill: `rgb(${colors[i][0]},${colors[i][1]},${colors[i][2]})`,
-                                })}" .location_data="${loc}"
-                                    @mousemove="${this.mouseMoveCallback}"
-                                    @mouseout="${this.mouseOutCallback}"
-                                    @mousedown="${this.mouseMoveCallback}"
-                                >
-                                    ${loc?.svg}
-                                </g>
-                            `))}
-                        </svg>
+                        <div id="map">
+                            <svg
+                                class="shadow-svg"
+                                viewBox="${
+                                    MapRenderer.map(min[0], min[0], min[0] + total_diff, 0, max_size) + ' ' + 
+                                    MapRenderer.map(min[1], min[1], min[1] + total_diff, 0, max_size) + ' ' +
+                                    MapRenderer.map(max[0], min[0], min[0] + total_diff, 0, max_size) + ' ' + 
+                                    MapRenderer.map(max[1], min[1], min[1] + total_diff, 0, max_size)
+                                }"
+                            >
+                                <filter id="dropshadow" height="130%">
+                                  <feGaussianBlur in="SourceAlpha" stdDeviation="5"/>
+                                  <feOffset dx="2" dy="2" result="offsetblur"/>
+                                  <feComponentTransfer>
+                                    <feFuncA type="linear" slope="0.5"/>
+                                  </feComponentTransfer>
+                                </filter>
+                                ${locations.map((loc, i) => (svg`
+                                    <g>${loc?.svg}</g>
+                                `))}
+                            </svg>
+                            <svg
+                                class="wrapping-svg"
+                                viewBox="${
+                                    MapRenderer.map(min[0], min[0], min[0] + total_diff, 0, max_size) + ' ' + 
+                                    MapRenderer.map(min[1], min[1], min[1] + total_diff, 0, max_size) + ' ' +
+                                    MapRenderer.map(max[0], min[0], min[0] + total_diff, 0, max_size) + ' ' + 
+                                    MapRenderer.map(max[1], min[1], min[1] + total_diff, 0, max_size)
+                                }"
+                            >
+                                ${locations.map((loc, i) => (svg`
+                                    <g class="geometry" style="${styleMap({
+                                        fill: `rgb(${colors[i][0]},${colors[i][1]},${colors[i][2]})`,
+                                    })}" .location_data="${loc}"
+                                        @mousemove="${this.mouseMoveCallback}"
+                                        @mouseout="${this.mouseOutCallback}"
+                                    >
+                                        ${loc?.svg}
+                                    </g>
+                                `))}
+                            </svg>
+                        </div>
                     </div>
                     <div class="title">${data.title}</div>
                     <div id="map-legend">${
