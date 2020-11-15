@@ -383,6 +383,7 @@ class MapDataInput extends LitElement {
                                                 class="text-field"
                                                 value="${data}"
                                                 type="number"
+                                                step="any"
                                                 @change="${e => this.updateData(i, j, e.target.value)}"
                                             />
                                         </td>

@@ -4,7 +4,7 @@
     "description": "A simple way to create map visualizations",
     "scripts": {
         "dist": "webpack -p",
-        "dev": "webpack-dev-server -d",
+        "dev": "webpack-dev-server -d --host 0.0.0.0",
         "ghpages": "yarn dist && node publish.js"
     },
     "author": "Roland Bernard",
