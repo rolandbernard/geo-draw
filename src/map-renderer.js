@@ -43,8 +43,8 @@ class MapRenderer extends LitElement {
                 justify-content: center;
             }
             svg.wrapping-svg {
-                stroke: var(--background);
-                stroke-width: 0.25%;
+                stroke: var(--background-darkish);
+                stroke-width: 0.125%;
                 stroke-linejoin: round;
                 stroke-linecap: round;
                 width: 100%;
@@ -53,17 +53,6 @@ class MapRenderer extends LitElement {
                 max-height: 100%;
                 display: block;
                 position: absolute;
-            }
-            svg.shadow-svg {
-                fill: black;
-                filter: url(#dropshadow);
-                width: 100%;
-                height: 100%;
-                max-width: 100%;
-                max-height: 100%;
-                display: block;
-                position: absolute;
-                pointer-events: none;
             }
             #map {
                 width: 100%;
@@ -147,6 +136,7 @@ class MapRenderer extends LitElement {
                 left: var(--anchor-point);
                 transform: translate(-50%, -50%) rotate(45deg);
                 background: var(--background-light);
+                will-change: top, left
             }
             div.info-field {
                 display: grid;
@@ -303,6 +293,7 @@ class MapRenderer extends LitElement {
     }
 
     mouseMoveCallback(event) {
+        const base_elem = event.target;
         let elem = event.target;
         if(elem?.tagName === 'path') {
             elem = elem.parentNode;
@@ -317,7 +308,7 @@ class MapRenderer extends LitElement {
                 Array.from(info_box.getElementsByClassName('info-field-value')).forEach((el, i) => {
                     el.innerText = Math.round(location.data[i] * 100) / 100;
                 });
-                const elem_pos = elem.getBoundingClientRect();
+                const elem_pos = base_elem.getBoundingClientRect();
                 const map_wrapper_pos = map_wrapper.getBoundingClientRect();
                 const x = Math.min(Math.max((elem_pos.x - map_wrapper_pos.x + elem_pos.width / 2), 12), map_wrapper_pos.width - 12);
                 const y = Math.min(Math.max((elem_pos.y - map_wrapper_pos.y + elem_pos.height / 2), 0), map_wrapper_pos.height);
@@ -519,7 +510,7 @@ class MapRenderer extends LitElement {
                 const min = locations.filter(loc => loc).map(loc => loc.min).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]);
                 const max = locations.filter(loc => loc).map(loc => loc.max).reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]);
                 const total_diff = Math.max(max[0] - min[0], max[1] - min[1]);
-                const max_size = Math.max(window.innerWidth, window.innerHeight);
+                const max_size = Math.max(window.innerWidth, window.innerHeight) * MAX_ZOOM;
                 locations.forEach(loc => {
                     if(loc) {
                         loc.svg = loc.coords.map(poly => (
@@ -559,26 +550,6 @@ class MapRenderer extends LitElement {
                             </div>
                         </div>
                         <div id="map">
-                            <svg
-                                class="shadow-svg"
-                                viewBox="${
-                                    MapRenderer.map(min[0], min[0], min[0] + total_diff, 0, max_size) + ' ' + 
-                                    MapRenderer.map(min[1], min[1], min[1] + total_diff, 0, max_size) + ' ' +
-                                    MapRenderer.map(max[0], min[0], min[0] + total_diff, 0, max_size) + ' ' + 
-                                    MapRenderer.map(max[1], min[1], min[1] + total_diff, 0, max_size)
-                                }"
-                            >
-                                <filter id="dropshadow" height="130%">
-                                  <feGaussianBlur in="SourceAlpha" stdDeviation="5"/>
-                                  <feOffset dx="2" dy="2" result="offsetblur"/>
-                                  <feComponentTransfer>
-                                    <feFuncA type="linear" slope="0.5"/>
-                                  </feComponentTransfer>
-                                </filter>
-                                ${locations.map((loc, i) => (svg`
-                                    <g>${loc?.svg}</g>
-                                `))}
-                            </svg>
                             <svg
                                 class="wrapping-svg"
                                 viewBox="${
