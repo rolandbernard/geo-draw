@@ -89,7 +89,7 @@ const MAX_POLY_PARTS: i32 = 16;
 const MAX_POLYGONS: i32 = 16;
 
 fn cross_product(x: &(f64, f64), y: &(f64, f64)) -> f64 {
-    return (x.0 * y.0) - (x.1 * y.0);
+    return (x.0 * y.1) - (x.1 * y.0);
 }
 
 fn polygon_outer_size(poly: &json::JsonValue) -> i64 {
@@ -129,7 +129,7 @@ fn write_poly_part(file: &mut File, part: &json::JsonValue) {
         let filtered_coords: Vec<&json::JsonValue> = part.members().filter(
             |&c| {
                 let dist = (c[0].as_f64().unwrap_or(0.0) - last.0, c[1].as_f64().unwrap_or(0.0) - last.1);
-                skip += f64::sqrt(dist.0*dist.0 + dist.1*dist.1) * MAX_POINTS_PER_PATH as f64 / length;
+                skip += f64::sqrt(dist.0*dist.0 + dist.1*dist.1) * (MAX_POINTS_PER_PATH as f64 + length) / length;
                 last = (c[0].as_f64().unwrap_or(0.0), c[1].as_f64().unwrap_or(0.0));
                 if skip >= 1.0 {
                     skip -= 1.0;
