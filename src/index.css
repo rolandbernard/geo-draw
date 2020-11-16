@@ -1,7 +1,7 @@
 
 * {
     --background-dark: #373F51;
-    --background-darkish: #40485A;
+    --background-darkish: #454d61;
     --background-light: #F8F8F8;
     --primary: #008DD5;
     --secondary: #CE8147;
@@ -19,10 +19,11 @@
     font-family: Roboto, sans-serif;
 }
 
-body, main, html {
-    position: fixed;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-    background: var(--background-light);
+main {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background: var(--background-dark);
 }
