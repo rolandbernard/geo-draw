@@ -154,7 +154,7 @@ class MapRenderer extends LitElement {
             span.info-field-value {
                 display: flex;
                 align-items: center;
-                justify-content: right;
+                justify-content: flex-end;
                 overflow: hidden;
                 text-overflow: ellipsis;
                 white-space: nowrap;
@@ -298,8 +298,10 @@ class MapRenderer extends LitElement {
             const element = this.shadowRoot.getElementById('map');
             if(element) {
                 window.requestAnimationFrame(() => {
-                    element.style.transform = `scale(${this.zoom_scale}) translate(${-this.zoom_center[0]}%,${-this.zoom_center[1]}%)`;
-                    element.style.opacity = 1;
+                    window.requestAnimationFrame(() => {
+                        element.style.transform = `scale(${this.zoom_scale}) translate(${-this.zoom_center[0]}%,${-this.zoom_center[1]}%)`;
+                        element.style.opacity = 1;
+                    });
                 });
             } else {
                 window.requestAnimationFrame(animationFrameCallback);
@@ -322,7 +324,7 @@ class MapRenderer extends LitElement {
                 const map_wrapper = this.shadowRoot.getElementById('map-wrapper');
                 name.innerText = location.name.split(',')[0];
                 Array.from(info_box.getElementsByClassName('info-field-value')).forEach((el, i) => {
-                    el.innerText = Math.round(location.data[i] * 100) / 100;
+                    el.innerText = (Math.round(location.data[i] * 100) / 100).toLocaleString();
                 });
                 const elem_pos = base_elem.getBoundingClientRect();
                 const map_wrapper_pos = map_wrapper.getBoundingClientRect();
@@ -609,11 +611,11 @@ class MapRenderer extends LitElement {
                                 ? (html`
                                     <span class="legend-label">${data.color_using ? data.columns[data.color_using[0]] : data.color_using[0]}</span>
                                     <span class="color-gradiant">
-                                        <span>${Math.round(data_max[0] * 100) / 100}</span>
+                                        <span>${(Math.round(data_max[0] * 100) / 100).toLocaleString()}</span>
                                         <span class="scale" style="${styleMap({
                                             background: `linear-gradient(${data.colors[0]},${data.defcolor})`,
                                         })}"></span>
-                                        <span>${Math.round(data_min[0] * 100) / 100}</span>
+                                        <span>${(Math.round(data_min[0] * 100) / 100).toLocaleString()}</span>
                                     </span>
                                 `)
                                 : null
