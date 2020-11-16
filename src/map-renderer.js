@@ -28,6 +28,7 @@ class MapRenderer extends LitElement {
                 width: 100%;
                 height: 100%;
                 display: block;
+                overflow: hidden;
             }
             div#map-renderer-root {
                 width: 100%;
@@ -46,7 +47,7 @@ class MapRenderer extends LitElement {
                 stroke: var(--background-darkish);
                 stroke-width: 0.125%;
                 stroke-linejoin: round;
-                stroke-linecap: round;
+                paint-order: stroke fill;
                 width: 100%;
                 height: 100%;
                 max-width: 100%;
@@ -59,7 +60,9 @@ class MapRenderer extends LitElement {
                 height: 100%;
                 max-width: 100%;
                 max-height: 100%;
-                will-change: transform;
+                transform: scale(5);
+                opacity: 0.01;
+                will-change: transform, opacity;
             }
             svg.wrapping-svg g:hover {
                 fill-opacity: 0.75;
@@ -290,6 +293,19 @@ class MapRenderer extends LitElement {
         super();
         this.zoom_scale = 1;
         this.zoom_center = [0, 0];
+        // This is a stupid trick to get chrome to render at a higher resolution
+        const animationFrameCallback = () => {
+            const element = this.shadowRoot.getElementById('map');
+            if(element) {
+                window.requestAnimationFrame(() => {
+                    element.style.transform = `scale(${this.zoom_scale}) translate(${-this.zoom_center[0]}%,${-this.zoom_center[1]}%)`;
+                    element.style.opacity = 1;
+                });
+            } else {
+                window.requestAnimationFrame(animationFrameCallback);
+            }
+        };
+        window.requestAnimationFrame(animationFrameCallback);
     }
 
     mouseMoveCallback(event) {
@@ -315,9 +331,17 @@ class MapRenderer extends LitElement {
                 info_box.style.left = x + 'px';
                 info_box.style.top = y + 'px';
                 info_box.classList.add('visible');
-                info_box.style.setProperty('--anchor-point', (x / map_wrapper_pos.width * 90 + 5) + '%');
-                info_box.style.setProperty('--anchor-at-bottom', (y > ((info_box.clientHeight + 12) * 1.2)) ? 1 : 0);
                 info_box.current_location = location;
+                if(x == 12) {
+                    info_box.style.setProperty('--anchor-point', '0%');
+                    info_box.style.setProperty('--anchor-at-bottom', (y / map_wrapper_pos.height * 0.8 + 0.1));
+                } else if(x == map_wrapper_pos.width - 12) {
+                    info_box.style.setProperty('--anchor-point', '100%');
+                    info_box.style.setProperty('--anchor-at-bottom', (y / map_wrapper_pos.height * 0.8 + 0.1));
+                } else {
+                    info_box.style.setProperty('--anchor-point', (x / map_wrapper_pos.width * 90 + 5) + '%');
+                    info_box.style.setProperty('--anchor-at-bottom', (y > ((info_box.clientHeight + 12) * 1.2)) ? 1 : 0);
+                }
             }
         } else {
             const info_box = this.shadowRoot.getElementById('info-box-wrapper');
@@ -345,8 +369,6 @@ class MapRenderer extends LitElement {
     }
 
     handleScroll(event) {
-        if(!this.zoom_scale) {
-        }
         event.preventDefault();
         let new_scale = this.zoom_scale;
         if (event.deltaY < 0) {
@@ -410,7 +432,6 @@ class MapRenderer extends LitElement {
             const diff = [touch_array[0][0] - touch_array[1][0], touch_array[0][1] - touch_array[1][1]];
             this.touch_dist = (diff[0]*diff[0] + diff[1]*diff[1]);
         }
-        event.preventDefault();
     }
 
     handleTouchMove(event) {
@@ -442,9 +463,8 @@ class MapRenderer extends LitElement {
             this.touch_dist = new_touch_dist;
             element.style.transform = `scale(${this.zoom_scale}) translate(${-this.zoom_center[0]}%,${-this.zoom_center[1]}%)`;
         }
-        event.preventDefault();
     }
-
+    
     async drawMap() {
         const data = this.data;
         try {
@@ -510,16 +530,20 @@ class MapRenderer extends LitElement {
                 const min = locations.filter(loc => loc).map(loc => loc.min).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]);
                 const max = locations.filter(loc => loc).map(loc => loc.max).reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]);
                 const total_diff = Math.max(max[0] - min[0], max[1] - min[1]);
-                const max_size = Math.max(window.innerWidth, window.innerHeight) * MAX_ZOOM;
+                const max_size = Math.max(window.innerWidth, window.innerHeight) * 5;
                 locations.forEach(loc => {
                     if(loc) {
                         loc.svg = loc.coords.map(poly => (
                             svg`<path d="${poly.map((part, i) => (
                                 (i == 0 ? part : part.reverse())
+                                    .map(coord => ([
+                                        Math.round(MapRenderer.map(coord[0], min[0], min[0] + total_diff, 0, max_size)),
+                                        Math.round(MapRenderer.map(coord[1], min[1], min[1] + total_diff, 0, max_size))
+                                    ])).filter((coord, i, arr) => coord[0] !== arr[i + 1]?.[0] || coord[1] !== arr[i + 1]?.[1])
                                     .map((coord, i) => (
                                         i == 0
-                                            ? 'M ' + MapRenderer.map(coord[0], min[0], min[0] + total_diff, 0, max_size) + ',' + MapRenderer.map(coord[1], min[1], min[1] + total_diff, 0, max_size)
-                                            : 'L ' + MapRenderer.map(coord[0], min[0], min[0] + total_diff, 0, max_size) + ',' + MapRenderer.map(coord[1], min[1], min[1] + total_diff, 0, max_size)
+                                            ? 'M' + coord[0] + ',' + coord[1]
+                                            : 'L' + coord[0] + ',' + coord[1]
                                     )).join(' ') + ' z'
                                 )).join(' ')
                             }"/>`
@@ -553,10 +577,10 @@ class MapRenderer extends LitElement {
                             <svg
                                 class="wrapping-svg"
                                 viewBox="${
-                                    MapRenderer.map(min[0], min[0], min[0] + total_diff, 0, max_size) + ' ' + 
-                                    MapRenderer.map(min[1], min[1], min[1] + total_diff, 0, max_size) + ' ' +
-                                    MapRenderer.map(max[0], min[0], min[0] + total_diff, 0, max_size) + ' ' + 
-                                    MapRenderer.map(max[1], min[1], min[1] + total_diff, 0, max_size)
+                                    Math.round(MapRenderer.map(min[0], min[0], min[0] + total_diff, 0, max_size)) + ' ' + 
+                                    Math.round(MapRenderer.map(min[1], min[1], min[1] + total_diff, 0, max_size)) + ' ' +
+                                    Math.round(MapRenderer.map(max[0], min[0], min[0] + total_diff, 0, max_size)) + ' ' + 
+                                    Math.round(MapRenderer.map(max[1], min[1], min[1] + total_diff, 0, max_size))
                                 }"
                             >
                                 ${locations.map((loc, i) => (svg`
