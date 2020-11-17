@@ -61,7 +61,7 @@ class MapRenderer extends LitElement {
                 max-width: 100%;
                 max-height: 100%;
                 transform: scale(5);
-                opacity: 0.01;
+                opacity: 0.001;
                 will-change: transform, opacity;
             }
             svg.wrapping-svg g:hover {
@@ -293,21 +293,6 @@ class MapRenderer extends LitElement {
         super();
         this.zoom_scale = 1;
         this.zoom_center = [0, 0];
-        // This is a stupid trick to get chrome to render at a higher resolution
-        const animationFrameCallback = () => {
-            const element = this.shadowRoot.getElementById('map');
-            if(element) {
-                window.requestAnimationFrame(() => {
-                    window.requestAnimationFrame(() => {
-                        element.style.transform = `scale(${this.zoom_scale}) translate(${-this.zoom_center[0]}%,${-this.zoom_center[1]}%)`;
-                        element.style.opacity = 1;
-                    });
-                });
-            } else {
-                window.requestAnimationFrame(animationFrameCallback);
-            }
-        };
-        window.requestAnimationFrame(animationFrameCallback);
     }
 
     mouseMoveCallback(event) {
@@ -467,6 +452,24 @@ class MapRenderer extends LitElement {
         }
     }
     
+    updated() {
+        // This is a stupid trick to get chrome to render at a higher resolution
+        const animationFrameCallback = () => {
+            const element = this.shadowRoot.getElementById('map');
+            if(element) {
+                window.requestAnimationFrame(() => {
+                    window.requestAnimationFrame(() => {
+                        element.style.transform = `scale(${this.zoom_scale}) translate(${-this.zoom_center[0]}%,${-this.zoom_center[1]}%)`;
+                        element.style.opacity = 1;
+                    });
+                });
+            } else {
+                window.requestAnimationFrame(animationFrameCallback);
+            }
+        };
+        window.requestAnimationFrame(animationFrameCallback);
+    }
+    
     async drawMap() {
         const data = this.data;
         try {
@@ -575,28 +578,27 @@ class MapRenderer extends LitElement {
                                 </div>
                             </div>
                         </div>
-                        <div id="map">
-                            <svg
-                                class="wrapping-svg"
-                                viewBox="${
-                                    Math.round(MapRenderer.map(min[0], min[0], min[0] + total_diff, 0, max_size)) + ' ' + 
-                                    Math.round(MapRenderer.map(min[1], min[1], min[1] + total_diff, 0, max_size)) + ' ' +
-                                    Math.round(MapRenderer.map(max[0], min[0], min[0] + total_diff, 0, max_size)) + ' ' + 
-                                    Math.round(MapRenderer.map(max[1], min[1], min[1] + total_diff, 0, max_size))
-                                }"
-                            >
-                                ${locations.map((loc, i) => (svg`
-                                    <g class="geometry" style="${styleMap({
-                                        fill: `rgb(${colors[i][0]},${colors[i][1]},${colors[i][2]})`,
-                                    })}" .location_data="${loc}"
-                                        @mousemove="${this.mouseMoveCallback}"
-                                        @mouseout="${this.mouseOutCallback}"
-                                    >
-                                        ${loc?.svg}
-                                    </g>
-                                `))}
-                            </svg>
-                        </div>
+                        <svg
+                            id="map"
+                            class="wrapping-svg"
+                            viewBox="${
+                                Math.round(MapRenderer.map(min[0], min[0], min[0] + total_diff, 0, max_size)) + ' ' + 
+                                Math.round(MapRenderer.map(min[1], min[1], min[1] + total_diff, 0, max_size)) + ' ' +
+                                Math.round(MapRenderer.map(max[0], min[0], min[0] + total_diff, 0, max_size)) + ' ' + 
+                                Math.round(MapRenderer.map(max[1], min[1], min[1] + total_diff, 0, max_size))
+                            }"
+                        >
+                            ${locations.map((loc, i) => (svg`
+                                <g class="geometry" style="${styleMap({
+                                    fill: `rgb(${colors[i][0]},${colors[i][1]},${colors[i][2]})`,
+                                })}" .location_data="${loc}"
+                                    @mousemove="${this.mouseMoveCallback}"
+                                    @mouseout="${this.mouseOutCallback}"
+                                >
+                                    ${loc?.svg}
+                                </g>
+                            `))}
+                        </svg>
                     </div>
                     <div class="title">${data.title}</div>
                     <div id="map-legend">${
