@@ -5,6 +5,7 @@ import { unsafeHTML } from 'lit-html/directives/unsafe-html';
 import './map-renderer';
 import './map-data-input';
 import Icon from './icons/logo.svg';
+import LinkIcon from './icons/link.svg';
 
 class EditingView extends LitElement {
 
@@ -63,14 +64,29 @@ class EditingView extends LitElement {
                 flex: 1 1 40%;
                 min-height: 40%;
                 min-width: 40%;
-            }
-            div.renderer {
                 box-shadow: var(--shadow-large);
+                position: relative;
             }
             :host {
                 height: 100%;
                 width: 100%;
                 display: block;
+            }
+            .link {
+                position: absolute;
+                bottom: 0.5rem;
+                left: 0.5rem;
+                fill: var(--primary);
+                width: 1.75rem;
+                height: 1.75rem;
+                padding: 6px;
+                background: var(--background-light);
+                border-radius: 50%;
+                z-index: 100;
+            }
+            .link:hover {
+                cursor: pointer;
+                opacity: 0.75;
             }
         `;
     }
@@ -125,6 +141,12 @@ class EditingView extends LitElement {
         window.location.hash = '#/edit/' + btoa(JSON.stringify(this.data));
     }
 
+    copyLink() {
+        const data = JSON.stringify(this.data);
+        const url = `${window.location.origin}/${window.location.pathname}/#/view/${btoa(data)}`;
+        navigator.clipboard.writeText(url);
+    }
+
     render() {
         return html`
             <div class="editing-view-root">
@@ -137,6 +159,9 @@ class EditingView extends LitElement {
                         ></map-data-input>
                     </div>
                     <div class="renderer">
+                        <div class="link" @click="${this.copyLink}">
+                            ${unsafeHTML(LinkIcon)}
+                        </div>
                         <map-renderer
                             .data="${this.data}"
                         ></map-renderer>
