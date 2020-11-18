@@ -2,8 +2,8 @@
 import { css, html, LitElement } from 'lit-element'
 import { until } from 'lit-html/directives/until';
 
-import './map-renderer';
-import './ui/spinner';
+import '../map/map-renderer';
+import '../ui/spinner';
 
 const demo_location = './static/demo/';
 

@@ -2,10 +2,10 @@
 import { css, html, LitElement } from 'lit-element'
 import { unsafeHTML } from 'lit-html/directives/unsafe-html';
 
-import './map-renderer';
-import './map-data-input';
-import Icon from './icons/logo.svg';
-import LinkIcon from './icons/link.svg';
+import '../map/map-renderer';
+import '../ui/map-data-input';
+import Icon from '../icons/logo.svg';
+import LinkIcon from '../icons/link.svg';
 
 class EditingView extends LitElement {
 

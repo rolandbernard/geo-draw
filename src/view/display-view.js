@@ -2,7 +2,7 @@
 import { css, html, LitElement } from 'lit-element'
 import { until } from 'lit-html/directives/until';
 
-import './map-renderer';
+import '../map/map-renderer';
 
 class DisplayView extends LitElement {
 
