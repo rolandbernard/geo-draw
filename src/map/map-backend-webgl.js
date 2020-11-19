@@ -77,12 +77,26 @@ class MapBackendWebGl extends LitElement {
         const map_pos = map.getBoundingClientRect();
         const [transform, scale] = this.generateTranslateAndScale();
         const client_pos_norm = [
-            2 * client_pos[0] / this.current_size[0] - 1.0,
-            1.0 - 2 * client_pos[1] / this.current_size[1],
+            2 * client_pos[0] / map_pos.width - 1.0,
+            1.0 - 2 * client_pos[1] / map_pos.height,
         ];
         return [
             client_pos_norm[0] / scale[0] - map_pos.x - transform[0],
             client_pos_norm[1] / scale[1] - map_pos.y - transform[1],
+        ];
+    }
+    
+    locationPosToClientPos(location_pos) {
+        const map = this.shadowRoot.getElementById('map');
+        const map_pos = map.getBoundingClientRect();
+        const [transform, scale] = this.generateTranslateAndScale();
+        const client_pos_norm = [
+            (location_pos[0] + transform[0] + map_pos.x) * scale[0],
+            (location_pos[1] + transform[1] + map_pos.y) * scale[1],
+        ];
+        return [
+            (client_pos_norm[0] + 1.0) / 2 * map_pos.width,
+            (1.0 - client_pos_norm[1]) / 2 * map_pos.height,
         ];
     }
 
@@ -95,17 +109,35 @@ class MapBackendWebGl extends LitElement {
                     if(polygon.min[0] <= pos[0] && polygon.min[1] <= pos[1] &&
                         polygon.max[0] >= pos[0] && polygon.max[1] >= pos[1]) {
                         for(let i = 0; i < polygon.triangles.length; i += 3) {
-                            const v1 = [polygon.vertices[2*i], polygon.vertices[2*i + 1]];
-                            const v2 = [polygon.vertices[2*(i + 1)], polygon.vertices[2*(i + 1) + 1]];
-                            const v3 = [polygon.vertices[2*(i + 2)], polygon.vertices[2*(i + 2) + 1]];
-                            function crossProduct(v1, v2) {
-                                return v1[0] * v2[1] - v1[1] * v2[0];
+                            const v1 = [
+                                polygon.vertices[2 * polygon.triangles[i]],
+                                polygon.vertices[2 * polygon.triangles[i] + 1]
+                            ];
+                            const v2 = [
+                                polygon.vertices[2 * polygon.triangles[i + 1]],
+                                polygon.vertices[2 * polygon.triangles[i + 1] + 1]
+                            ];
+                            const v3 = [
+                                polygon.vertices[2 * polygon.triangles[i + 2]],
+                                polygon.vertices[2 * polygon.triangles[i + 2] + 1]
+                            ];
+                            function sign(p1, p2, p3) {
+                                return (p1[0] - p3[0]) * (p2[1] - p3[1]) - (p2[0] - p3[0]) * (p1[1] - p3[1]);
                             }
-                            const cross1 = crossProduct([pos[0] - v1[0], pos[1] - v1[1]], [v2[0] - v1[0], v2[1] - v1[1]]);
-                            const cross2 = crossProduct([pos[0] - v2[0], pos[1] - v2[1]], [v3[0] - v2[0], v3[1] - v2[1]]);
-                            const cross3 = crossProduct([pos[0] - v3[0], pos[1] - v3[1]], [v1[0] - v3[0], v1[1] - v3[1]]);
-                            if(cross1 >= 0 && cross2 >= 0 && cross3 >= 0) {
-                                console.log(location.name);
+                            const d1 = sign(pos, v1, v2);
+                            const d2 = sign(pos, v2, v3);
+                            const d3 = sign(pos, v3, v1);
+                            const has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+                            const has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+                            if(!(has_neg && has_pos)) {
+                                this.current_hover = location;
+                                const my_event = new Event('hover');
+                                my_event.location = location;
+                                my_event.position = this.locationPosToClientPos([
+                                    (polygon.min[0] + polygon.max[0]) / 2,
+                                    (polygon.min[1] + polygon.max[1]) / 2
+                                ]);
+                                this.dispatchEvent(my_event);
                                 return;
                             }
                         }
@@ -126,7 +158,10 @@ class MapBackendWebGl extends LitElement {
     
     handleTouchStart(event) {
         if(event.touches.length === 1) {
-            this.handleMouseMove(event);
+            this.handleMouseMove({
+                clientX: event.touches[0].clientX,
+                clientY: event.touches[0].clientY,
+            });
         } else {
             this.handleMouseOut(event);
         }
@@ -187,7 +222,7 @@ class MapBackendWebGl extends LitElement {
                 gl.uniform2fv(stroke_data.scale_uniform, scale);
                 gl.uniform2fv(stroke_data.scale2_uniform, stroke_scale);
                 gl.uniform1f(stroke_data.width_uniform, 0.005);
-                gl.uniform3fv(stroke_data.color_uniform, [0.216, 0.247, 0.318].map(el => el * 1.25));
+                gl.uniform3fv(stroke_data.color_uniform, [0.271, 0.302, 0.38]);
                 for(const polygon of location.polygons) {    
                     gl.bindBuffer(gl.ARRAY_BUFFER, polygon.gl_outline_position_buffer);
                     gl.vertexAttribPointer(stroke_data.position_attribute, 2, gl.FLOAT, false, 0, 0);
@@ -208,7 +243,7 @@ class MapBackendWebGl extends LitElement {
                 gl.uniform2fv(fill_data.translate_uniform, translate);
                 gl.uniform2fv(fill_data.scale_uniform, scale);
                 if(location === this.current_hover) {
-                    gl.uniform3fv(fill_data.color_uniform, location.color.map(el => el * 0.9));
+                    gl.uniform3fv(fill_data.color_uniform, location.color.map(el => el * 0.8));
                 } else {
                     gl.uniform3fv(fill_data.color_uniform, location.color);
                 }
@@ -226,7 +261,6 @@ class MapBackendWebGl extends LitElement {
             this.last_scale = this.zoom_scale;
             this.last_hover = this.current_hover;
             this.last_size = this.current_size;
-            console.log('rerender');
         }
         window.requestAnimationFrame(this.renderMapInCanvas.bind(this));
     }
