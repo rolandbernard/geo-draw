@@ -284,16 +284,16 @@ class MapRenderer extends LitElement {
                 el.innerText = (Math.round(event.location.data[i] * 100) / 100).toLocaleString();
             });
             const map_wrapper_pos = map_wrapper.getBoundingClientRect();
-            const x = Math.min(Math.max(event.position[0] - map_wrapper_pos.x, 12), map_wrapper_pos.width - 12);
-            const y = Math.min(Math.max(event.position[1] - map_wrapper_pos.y, 0), map_wrapper_pos.height);
+            const x = Math.min(Math.max(event.position[0] - map_wrapper_pos.x, 18.5), map_wrapper_pos.width - 18.5);
+            const y = Math.min(Math.max(event.position[1] - map_wrapper_pos.y, 10), map_wrapper_pos.height - 10);
             info_box.style.left = x + 'px';
             info_box.style.top = y + 'px';
             info_box.classList.add('visible');
             info_box.current_location = location;
-            if (x == 12) {
+            if (x == 18.5) {
                 info_box.style.setProperty('--anchor-point', '0%');
                 info_box.style.setProperty('--anchor-at-bottom', (y / map_wrapper_pos.height * 0.8 + 0.1));
-            } else if (x == map_wrapper_pos.width - 12) {
+            } else if (x == map_wrapper_pos.width - 18.5) {
                 info_box.style.setProperty('--anchor-point', '100%');
                 info_box.style.setProperty('--anchor-at-bottom', (y / map_wrapper_pos.height * 0.8 + 0.1));
             } else {
