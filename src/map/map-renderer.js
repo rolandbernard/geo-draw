@@ -4,8 +4,12 @@ import { styleMap } from 'lit-html/directives/style-map';
 import { until } from 'lit-html/directives/until';
 
 import '../ui/spinner';
-import { map as mapFromTo } from '../util';
-import(/* webpackChunkName: "map-backend-svg" */ './map-backend-svg');
+import { map as mapFromTo, hasWebGlSupport } from '../util';
+if(hasWebGlSupport()) {
+    import(/* webpackChunkName: "map-backend-webgl" */ './map-backend-webgl');
+} else {
+    import(/* webpackChunkName: "map-backend-svg" */ './map-backend-svg');
+}
 
 const data_location = './static/data/';
 const location_cache = {};
@@ -35,10 +39,9 @@ class MapRenderer extends LitElement {
             div#map-renderer-root {
                 width: 100%;
                 height: 100%;
-                overflow: visible;
+                overflow: hidden;
                 position: relative;
                 color: white;
-                padding: 1rem;
                 --background: var(--background-dark);
                 background: var(--background);
                 display: flex;
@@ -395,41 +398,45 @@ class MapRenderer extends LitElement {
     handleTouchEnd(event) {
         event.preventDefault();
     }
+   
+    static getLocations(locations) {
+        return Promise.all(locations.map(async location => {
+            if (location) {
+                if (!location_cache[location]) {
+                    try {
+                        const res = await fetch(`${data_location}/${location}.bin`);
+                        if (res.ok) {
+                            const data = MapRenderer.parseBinaryData(await res.arrayBuffer());
+                            data.coords = data.coords.map(poly => poly.map(part => (
+                                part.map(([lon, lat]) => MapRenderer.project([lon / 1e7, lat / 1e7]))
+                            )));
+                            location_cache[location] = {
+                                name: data.name,
+                                min: data.coords.reduce((a, b) => a.concat(b), []).reduce((a, b) => a.concat(b), [])
+                                    .reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
+                                max: data.coords.reduce((a, b) => a.concat(b), []).reduce((a, b) => a.concat(b), [])
+                                    .reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
+                                coords: data.coords,
+                            };
+                        } else {
+                            location_cache[location] = null;
+                        }
+                    } catch (e) {
+                        return null;
+                    }
+                }
+                return location_cache[location];
+            } else {
+                return null;
+            }
+        }));
+    }
     
     async drawMap() {
         const data = this.data;
         try {
             if (data?.locations?.length > 0) {
-                const locations_promise = Promise.all(data.locations.map(async location => {
-                    if(location) {
-                        if (!location_cache[location]) {
-                            try {
-                                const res = await fetch(`${data_location}/${location}.bin`);
-                                if(res.ok) {
-                                    const data = MapRenderer.parseBinaryData(await res.arrayBuffer());
-                                    data.coords = data.coords.map(poly => poly.map(part => (
-                                        part.map(([lon, lat]) => MapRenderer.project([lon / 1e7, lat / 1e7]).map(el => 1000 * el))
-                                    )));
-                                    location_cache[location] = {
-                                        name: data.name,
-                                        min: data.coords.reduce((a, b) => a.concat(b), []).reduce((a, b) => a.concat(b), [])
-                                            .reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
-                                        max: data.coords.reduce((a, b) => a.concat(b), []).reduce((a, b) => a.concat(b), [])
-                                            .reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
-                                        coords: data.coords,
-                                    };
-                                } else {
-                                    location_cache[location] = null;
-                                }
-                            } catch (e) {
-                                return null;
-                            }
-                        }
-                        return location_cache[location];
-                    } else {
-                        return null;
-                    }
-                }));
+                const locations_promise = MapRenderer.getLocations(data.locations);
                 if(data.title) {
                     document.title = data.title;
                 }

@@ -83,6 +83,10 @@ module.exports = {
                 use: 'svg-inline-loader'
             },
             {
+                test: /\.glsl$/i,
+                use: 'raw-loader'
+            },
+            {
                 test: /\.(woff(2)?|ttf|eot)(\?v=\d+\.\d+\.\d+)?$/,
                 use: [
                     {

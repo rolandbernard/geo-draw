@@ -35,7 +35,7 @@ class MapBackendSvg extends LitElement {
                 display: block;
                 position: absolute;
             }
-            svg.wrapping-svg g:hover {
+            svg#map g:hover {
                 fill-opacity: 0.75;
             }
         `;
@@ -77,7 +77,6 @@ class MapBackendSvg extends LitElement {
         if(elem?.tagName === 'path') {
             elem = elem.parentNode;
         }
-        const info_box = this.shadowRoot.getElementById('info-box-wrapper');
         if(elem?.location_data) {
             const location = elem?.location_data;
             const elem_pos = base_elem.getBoundingClientRect();
@@ -94,7 +93,7 @@ class MapBackendSvg extends LitElement {
         }
     }
 
-    handleMouseOut(event) {
+    handleMouseOut() {
         const my_event = new Event('hover');
         my_event.location = null;
         my_event.position = null;

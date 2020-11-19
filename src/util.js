@@ -10,3 +10,13 @@ export function map(value, min_in, max_in, min_out, max_out) {
         return (value - min_in) / (max_in - min_in) * (max_out - min_out) + min_out;
     }
 }
+
+export function hasWebGlSupport() {
+    try {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        return ctx;
+    } catch (e) {
+        return false;
+    }
+}
