@@ -412,10 +412,8 @@ class MapRenderer extends LitElement {
                             )));
                             location_cache[location] = {
                                 name: data.name,
-                                min: data.coords.reduce((a, b) => a.concat(b), []).reduce((a, b) => a.concat(b), [])
-                                    .reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
-                                max: data.coords.reduce((a, b) => a.concat(b), []).reduce((a, b) => a.concat(b), [])
-                                    .reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
+                                min: data.coords.flat(2).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
+                                max: data.coords.flat(2).reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
                                 coords: data.coords,
                             };
                         } else {
