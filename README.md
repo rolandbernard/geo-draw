@@ -4,10 +4,10 @@ This is a simple web application that allows the generation of map visualization
 All the processing happens on the client and the server can simply be a static web
 server.
 
-This is only a small project I started to learn the LitElement library and try out
-the Rust programming language a bit.
+This is only a small project I started, to learn lit-html/LitElement, WebGl and try out
+the Rust programming language a bit more.
 
-The website is not yet finished, but a example of what is possible can be found here:
+A example of what is possible can be found here:
 * https://rolandbernard.github.io/geo-draw/#/demo/covid-south-tyrol-newest
 * https://rolandbernard.github.io/geo-draw/#/demo/covid-italy-newest
 * https://rolandbernard.github.io/geo-draw/#/demo/covid-world-newest
