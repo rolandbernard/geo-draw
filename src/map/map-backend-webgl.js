@@ -238,7 +238,7 @@ class MapBackendWebGl extends LitElement {
                     
                     let offset = 0;
                     for(const part of polygon.coords) {
-                        gl.drawArrays(gl.TRIANGLE_STRIP, offset, (part.length + 1) * 4);
+                        gl.drawArrays(gl.TRIANGLE_STRIP, offset * 4, (part.length + 1) * 4);
                         offset += part.length + 1;
                     }
                 }
