@@ -160,6 +160,7 @@ class MapBackendSvg extends LitElement {
                     Math.round(map(max[1], min[1], min[1] + total_diff, 0, max_size))
                 }"
                 @mousemove="${this.handleMouseMove}"
+                @wheel="${this.handleMouseMove}"
                 @mouseout="${this.handleMouseOut}"
                 @touchstart="${this.handleTouchStart}"
             >
