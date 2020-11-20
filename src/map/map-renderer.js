@@ -3,7 +3,13 @@ import { LitElement, html, svg, css } from 'lit-element';
 import { styleMap } from 'lit-html/directives/style-map';
 import { until } from 'lit-html/directives/until';
 
-import './ui/spinner';
+import '../ui/spinner';
+import { map as mapFromTo, hasWebGlSupport } from '../util';
+if(hasWebGlSupport()) {
+    import(/* webpackChunkName: "map-backend-webgl" */ './map-backend-webgl');
+} else {
+    import(/* webpackChunkName: "map-backend-svg" */ './map-backend-svg');
+}
 
 const data_location = './static/data/';
 const location_cache = {};
@@ -33,39 +39,14 @@ class MapRenderer extends LitElement {
             div#map-renderer-root {
                 width: 100%;
                 height: 100%;
-                overflow: visible;
+                overflow: hidden;
                 position: relative;
                 color: white;
-                padding: 1rem;
                 --background: var(--background-dark);
                 background: var(--background);
                 display: flex;
                 align-items: center;
                 justify-content: center;
-            }
-            svg.wrapping-svg {
-                stroke: var(--background-darkish);
-                stroke-width: 0.125%;
-                stroke-linejoin: round;
-                paint-order: stroke fill;
-                width: 100%;
-                height: 100%;
-                max-width: 100%;
-                max-height: 100%;
-                display: block;
-                position: absolute;
-            }
-            #map {
-                width: 100%;
-                height: 100%;
-                max-width: 100%;
-                max-height: 100%;
-                transform: scale(5);
-                opacity: 0.001;
-                will-change: transform, opacity;
-            }
-            svg.wrapping-svg g:hover {
-                fill-opacity: 0.75;
             }
             div#map-wrapper {
                 position: relative;
@@ -291,44 +272,33 @@ class MapRenderer extends LitElement {
     
     constructor() {
         super();
-        this.zoom_scale = 1;
-        this.zoom_center = [0, 0];
     }
 
-    mouseMoveCallback(event) {
-        const base_elem = event.target;
-        let elem = event.target;
-        if(elem?.tagName === 'path') {
-            elem = elem.parentNode;
-        }
+    handleLocationHover(event) {
         const info_box = this.shadowRoot.getElementById('info-box-wrapper');
-        if(elem?.location_data) {
-            const location = elem?.location_data;
-            if (!info_box.current_location !== location) {
-                const name = this.shadowRoot.getElementById('info-box-name');
-                const map_wrapper = this.shadowRoot.getElementById('map-wrapper');
-                name.innerText = location.name.split(',')[0];
-                Array.from(info_box.getElementsByClassName('info-field-value')).forEach((el, i) => {
-                    el.innerText = (Math.round(location.data[i] * 100) / 100).toLocaleString();
-                });
-                const elem_pos = base_elem.getBoundingClientRect();
-                const map_wrapper_pos = map_wrapper.getBoundingClientRect();
-                const x = Math.min(Math.max((elem_pos.x - map_wrapper_pos.x + elem_pos.width / 2), 12), map_wrapper_pos.width - 12);
-                const y = Math.min(Math.max((elem_pos.y - map_wrapper_pos.y + elem_pos.height / 2), 0), map_wrapper_pos.height);
-                info_box.style.left = x + 'px';
-                info_box.style.top = y + 'px';
-                info_box.classList.add('visible');
-                info_box.current_location = location;
-                if(x == 12) {
-                    info_box.style.setProperty('--anchor-point', '0%');
-                    info_box.style.setProperty('--anchor-at-bottom', (y / map_wrapper_pos.height * 0.8 + 0.1));
-                } else if(x == map_wrapper_pos.width - 12) {
-                    info_box.style.setProperty('--anchor-point', '100%');
-                    info_box.style.setProperty('--anchor-at-bottom', (y / map_wrapper_pos.height * 0.8 + 0.1));
-                } else {
-                    info_box.style.setProperty('--anchor-point', (x / map_wrapper_pos.width * 90 + 5) + '%');
-                    info_box.style.setProperty('--anchor-at-bottom', (y > ((info_box.clientHeight + 12) * 1.2)) ? 1 : 0);
-                }
+        if(event.location && event.position) {
+            const name = this.shadowRoot.getElementById('info-box-name');
+            const map_wrapper = this.shadowRoot.getElementById('map-wrapper');
+            name.innerText = event.location.name.split(',')[0];
+            Array.from(info_box.getElementsByClassName('info-field-value')).forEach((el, i) => {
+                el.innerText = (Math.round(event.location.data[i] * 100) / 100).toLocaleString();
+            });
+            const map_wrapper_pos = map_wrapper.getBoundingClientRect();
+            const x = Math.min(Math.max(event.position[0] - map_wrapper_pos.x, 18.5), map_wrapper_pos.width - 18.5);
+            const y = Math.min(Math.max(event.position[1] - map_wrapper_pos.y, 10), map_wrapper_pos.height - 10);
+            info_box.style.left = x + 'px';
+            info_box.style.top = y + 'px';
+            info_box.classList.add('visible');
+            info_box.current_location = location;
+            if (x == 18.5) {
+                info_box.style.setProperty('--anchor-point', '0%');
+                info_box.style.setProperty('--anchor-at-bottom', (y / map_wrapper_pos.height * 0.8 + 0.1));
+            } else if (x == map_wrapper_pos.width - 18.5) {
+                info_box.style.setProperty('--anchor-point', '100%');
+                info_box.style.setProperty('--anchor-at-bottom', (y / map_wrapper_pos.height * 0.8 + 0.1));
+            } else {
+                info_box.style.setProperty('--anchor-point', (x / map_wrapper_pos.width * 90 + 5) + '%');
+                info_box.style.setProperty('--anchor-at-bottom', (y > ((info_box.clientHeight + 12) * 1.2)) ? 1 : 0);
             }
         } else {
             const info_box = this.shadowRoot.getElementById('info-box-wrapper');
@@ -336,50 +306,27 @@ class MapRenderer extends LitElement {
             info_box.current_location = null;
         }
     }
-    
-    mouseOutCallback() {
-        const info_box = this.shadowRoot.getElementById('info-box-wrapper');
-        info_box.classList.remove('visible');
-        info_box.current_location = null;
-    }
-    
-    static map(value, min_in, max_in, min_out, max_out) {
-        if(min_in === max_in) {
-            return max_out;
-        } else if(value < min_in) {
-            return min_out;
-        } else if(value > max_in) {
-            return max_out;
-        } else {
-            return (value - min_in) / (max_in - min_in) * (max_out - min_out) + min_out;
-        }
-    }
 
     handleScroll(event) {
         event.preventDefault();
-        let new_scale = this.zoom_scale;
+        const map = this.shadowRoot.getElementById('map-backend');
+        let new_scale = map.scale;
         if (event.deltaY < 0) {
-            new_scale *= MapRenderer.map(event.deltaY, 0, -10, 1.1, 1.5);
+            new_scale *= mapFromTo(event.deltaY, 0, -10, 1.1, 1.5);
         } else {
-            new_scale *= MapRenderer.map(event.deltaY, 0, 10, 0.8, 0.95);
+            new_scale *= mapFromTo(event.deltaY, 0, 10, 0.8, 0.95);
         }
         new_scale = Math.min(Math.max(MIN_ZOOM, new_scale), MAX_ZOOM);
-        const ds = new_scale / this.zoom_scale;
-        const element = this.shadowRoot.getElementById('map');
-        const element_pos = element.getBoundingClientRect();
-        const pointer = [
-            (event.clientX - element_pos.x - element_pos.width / 2) / element_pos.width * 100,
-            (event.clientY - element_pos.y - element_pos.height / 2) / element_pos.height * 100
-        ];
-        const delta = [pointer[0] - this.zoom_center[0], pointer[1] - this.zoom_center[1]].map(el => el * (1 - 1 / ds));
-        const new_center = [this.zoom_center[0] + delta[0], this.zoom_center[1] + delta[1]];
-        this.zoom_scale = new_scale;
-        this.zoom_center = new_center.map(pos => Math.min(Math.max(pos, -50), 50));
-        element.style.transform = `scale(${this.zoom_scale}) translate(${-this.zoom_center[0]}%,${-this.zoom_center[1]}%)`;
-        this.mouseMoveCallback(event);
+        const ds = new_scale / map.scale;
+        const center = map.center;
+        const pointer = map.clientPosToMapPos([event.clientX, event.clientY]);
+        const delta = [(pointer[0] - center[0]) * (1 - 1 / ds), (pointer[1] - center[1]) * (1 - 1 / ds)];
+        const new_center = [center[0] + delta[0], center[1] + delta[1]];
+        map.setCenterAndScale(new_center, new_scale);
     }
 
     handleDragStart(event) {
+        event.preventDefault();
         const element_wrap = this.shadowRoot.getElementById('map-wrapper');
         this.last_drag_pos = [event.clientX, event.clientY];
         element_wrap.onmouseup = this.handleDragEnd.bind(this);
@@ -389,17 +336,18 @@ class MapRenderer extends LitElement {
     }
 
     handleDragMove(event) {
-        const element = this.shadowRoot.getElementById('map');
-        const element_pos = element.getBoundingClientRect();
-        const diff = [event.clientX - this.last_drag_pos[0], event.clientY - this.last_drag_pos[1]];
+        event.preventDefault();
+        const map = this.shadowRoot.getElementById('map-backend');
+        const last_map_pos = map.clientPosToMapPos(this.last_drag_pos);
         this.last_drag_pos = [event.clientX, event.clientY];
-        this.zoom_center[0] -= diff[0] / element_pos.width * 100;
-        this.zoom_center[1] -= diff[1] / element_pos.height * 100;
-        this.zoom_center = this.zoom_center.map(pos => Math.min(Math.max(pos, -50), 50));
-        element.style.transform = `scale(${this.zoom_scale}) translate(${-this.zoom_center[0]}%,${-this.zoom_center[1]}%)`;
+        const current_map_pos = map.clientPosToMapPos([event.clientX, event.clientY]);
+        const diff = [current_map_pos[0] - last_map_pos[0], current_map_pos[1] - last_map_pos[1]];
+        const new_center = [map.center[0] - diff[0], map.center[1] - diff[1]];
+        map.setCenterAndScale(new_center, map.scale);
     }
 
-    handleDragEnd() {
+    handleDragEnd(event) {
+        event.preventDefault();
         const element_wrap = this.shadowRoot.getElementById('map-wrapper');
         element_wrap.onmouseup = null;
         element_wrap.onmouseleave = null;
@@ -408,11 +356,7 @@ class MapRenderer extends LitElement {
     }
 
     handleTouchStart(event) {
-        if(event.touches.length == 1) {
-            this.mouseMoveCallback(event);
-        } else {
-            this.mouseOutCallback();
-        }
+        event.preventDefault();
         if(event.touches.length == 2) {
             const touch_array = [[event.touches[0].clientX, event.touches[0].clientY], [event.touches[1].clientX, event.touches[1].clientY]];
             this.avg_touch_pos = [(touch_array[0][0] + touch_array[1][0]) / 2, (touch_array[0][1] + touch_array[1][1]) / 2]
@@ -422,88 +366,76 @@ class MapRenderer extends LitElement {
     }
 
     handleTouchMove(event) {
+        event.preventDefault();
         if(event.touches.length == 2) {
-            const element = this.shadowRoot.getElementById('map');
-            const element_pos = element.getBoundingClientRect();
+            const map = this.shadowRoot.getElementById('map-backend');
             const touch_array = [[event.touches[0].clientX, event.touches[0].clientY], [event.touches[1].clientX, event.touches[1].clientY]];
+            // Translation
             const new_touch_pos = [(touch_array[0][0] + touch_array[1][0]) / 2, (touch_array[0][1] + touch_array[1][1]) / 2]
-            this.zoom_center[0] -= (new_touch_pos[0] - this.avg_touch_pos[0]) / element_pos.width * 100;
-            this.zoom_center[1] -= (new_touch_pos[1] - this.avg_touch_pos[1]) / element_pos.height * 100;
-
-            const diff = [touch_array[0][0] - touch_array[1][0], touch_array[0][1] - touch_array[1][1]];
-            const new_touch_dist = (diff[0]*diff[0] + diff[1]*diff[1]);
-            if(this.touch_dist !== 0 && new_touch_dist !== 0) {
-                let new_zoom_scale = this.zoom_scale * new_touch_dist / this.touch_dist;
-                new_zoom_scale = Math.min(Math.max(MIN_ZOOM, new_zoom_scale), MAX_ZOOM);
-                const ds = new_zoom_scale / this.zoom_scale;
-                const pointer = [
-                    (new_touch_pos[0] - element_pos.x - element_pos.width / 2) / element_pos.width * 100,
-                    (new_touch_pos[1] - element_pos.y - element_pos.height / 2) / element_pos.height * 100
-                ];
-                const delta = [pointer[0] - this.zoom_center[0], pointer[1] - this.zoom_center[1]].map(el => el * (1 - 1 / ds));
-                const new_center = [this.zoom_center[0] + delta[0], this.zoom_center[1] + delta[1]];
-                this.zoom_scale = new_zoom_scale;
-                this.zoom_center = new_center;
-            }
-            this.zoom_center = this.zoom_center.map(pos => Math.min(Math.max(pos, -50), 50));
+            const last_map_pos = map.clientPosToMapPos(this.avg_touch_pos);
             this.avg_touch_pos = new_touch_pos;
-            this.touch_dist = new_touch_dist;
-            element.style.transform = `scale(${this.zoom_scale}) translate(${-this.zoom_center[0]}%,${-this.zoom_center[1]}%)`;
+            const current_map_pos = map.clientPosToMapPos([new_touch_pos[0], new_touch_pos[1]]);
+            const diff = [current_map_pos[0] - last_map_pos[0], current_map_pos[1] - last_map_pos[1]];
+            let new_center = [map.center[0] - diff[0], map.center[1] - diff[1]];
+            // Scaling
+            let new_scale = map.scale;
+            const touch_diff = [touch_array[0][0] - touch_array[1][0], touch_array[0][1] - touch_array[1][1]];
+            const new_touch_dist = (touch_diff[0]*touch_diff[0] + touch_diff[1]*touch_diff[1]);
+            if(this.touch_dist !== 0 && new_touch_dist !== 0) {
+                new_scale *= new_touch_dist / this.touch_dist;
+                this.touch_dist = new_touch_dist;
+                new_scale = Math.min(Math.max(MIN_ZOOM, new_scale), MAX_ZOOM);
+                const ds = new_scale / map.scale;
+                const pointer = map.clientPosToMapPos(new_touch_pos);
+                const delta = [(pointer[0] - new_center[0]) * (1 - 1 / ds), (pointer[1] - new_center[1]) * (1 - 1 / ds)];
+                new_center[0] += delta[0];
+                new_center[1] += delta[1];
+            }
+            map.setCenterAndScale(new_center, new_scale);
         }
     }
     
-    updated() {
-        // This is a stupid trick to get chrome to render at a higher resolution
-        const animationFrameCallback = () => {
-            const element = this.shadowRoot.getElementById('map');
-            if(element) {
-                window.requestAnimationFrame(() => {
-                    window.requestAnimationFrame(() => {
-                        element.style.transform = `scale(${this.zoom_scale}) translate(${-this.zoom_center[0]}%,${-this.zoom_center[1]}%)`;
-                        element.style.opacity = 1;
-                    });
-                });
+    handleTouchEnd(event) {
+        event.preventDefault();
+    }
+   
+    static getLocations(locations) {
+        return Promise.all(locations.map(async location => {
+            if (location) {
+                if (!location_cache[location]) {
+                    try {
+                        const res = await fetch(`${data_location}/${location}.bin`);
+                        if (res.ok) {
+                            const data = MapRenderer.parseBinaryData(await res.arrayBuffer());
+                            data.coords = data.coords.map(poly => poly.map(part => (
+                                part.map(([lon, lat]) => MapRenderer.project([lon / 1e7, lat / 1e7]))
+                            )));
+                            location_cache[location] = {
+                                id: location,
+                                name: data.name,
+                                min: data.coords.flat(2).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
+                                max: data.coords.flat(2).reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
+                                coords: data.coords,
+                            };
+                        } else {
+                            location_cache[location] = null;
+                        }
+                    } catch (e) {
+                        return null;
+                    }
+                }
+                return location_cache[location];
             } else {
-                window.requestAnimationFrame(animationFrameCallback);
+                return null;
             }
-        };
-        window.requestAnimationFrame(animationFrameCallback);
+        }));
     }
     
     async drawMap() {
         const data = this.data;
         try {
             if (data?.locations?.length > 0) {
-                const locations_promise = Promise.all(data.locations.map(async location => {
-                    if(location) {
-                        if (!location_cache[location]) {
-                            try {
-                                const res = await fetch(`${data_location}/${location}.bin`);
-                                if(res.ok) {
-                                    const data = MapRenderer.parseBinaryData(await res.arrayBuffer());
-                                    data.coords = data.coords.map(poly => poly.map(part => (
-                                        part.map(([lon, lat]) => MapRenderer.project([lon / 1e7, lat / 1e7]).map(el => 1000 * el))
-                                    )));
-                                    location_cache[location] = {
-                                        name: data.name,
-                                        min: data.coords.reduce((a, b) => a.concat(b), []).reduce((a, b) => a.concat(b), [])
-                                            .reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
-                                        max: data.coords.reduce((a, b) => a.concat(b), []).reduce((a, b) => a.concat(b), [])
-                                            .reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
-                                        coords: data.coords,
-                                    };
-                                } else {
-                                    location_cache[location] = null;
-                                }
-                            } catch (e) {
-                                return null;
-                            }
-                        }
-                        return location_cache[location];
-                    } else {
-                        return null;
-                    }
-                }));
+                const locations_promise = MapRenderer.getLocations(data.locations);
                 if(data.title) {
                     document.title = data.title;
                 }
@@ -516,7 +448,7 @@ class MapRenderer extends LitElement {
                     colors = color_data.map(data_vec => {
                         if (data_vec.length == 1) {
                             const color = MapRenderer.parseColor(data.colors[0]);
-                            const prop = MapRenderer.colorPropScale(MapRenderer.map(data_vec[0], min_data[0], max_data[0], 0, 1));
+                            const prop = MapRenderer.colorPropScale(mapFromTo(data_vec[0], min_data[0], max_data[0], 0, 1));
                             return MapRenderer.blendColors([color, defcolor], [prop, 1 - prop]);
                         } else {
                             const sum = data_vec.reduce((a, b) => a + b);
@@ -528,33 +460,12 @@ class MapRenderer extends LitElement {
                 } else {
                     colors = data.locations.map(() => defcolor);
                 }
-                const locations = (await locations_promise).map((loc, i) => loc ? { ...loc, data: data.data[i], columns: data.columns } : null);
-                if(locations.filter?.(loc => loc).length == 0) {
+                const locations = (await locations_promise)
+                    .map((loc, i) => loc ? { ...loc, color: colors[i], data: data.data[i], columns: data.columns } : null)
+                    .filter(loc => loc);
+                if(locations.length == 0) {
                     throw 'No data';
                 }
-                const min = locations.filter(loc => loc).map(loc => loc.min).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]);
-                const max = locations.filter(loc => loc).map(loc => loc.max).reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]);
-                const total_diff = Math.max(max[0] - min[0], max[1] - min[1]);
-                const max_size = Math.max(window.innerWidth, window.innerHeight) * 5;
-                locations.forEach(loc => {
-                    if(loc) {
-                        loc.svg = loc.coords.map(poly => (
-                            svg`<path d="${poly.map((part, i) => (
-                                (i == 0 ? part : part.reverse())
-                                    .map(coord => ([
-                                        Math.round(MapRenderer.map(coord[0], min[0], min[0] + total_diff, 0, max_size)),
-                                        Math.round(MapRenderer.map(coord[1], min[1], min[1] + total_diff, 0, max_size))
-                                    ])).filter((coord, i, arr) => coord[0] !== arr[i + 1]?.[0] || coord[1] !== arr[i + 1]?.[1])
-                                    .map((coord, i) => (
-                                        i == 0
-                                            ? 'M' + coord[0] + ',' + coord[1]
-                                            : 'L' + coord[0] + ',' + coord[1]
-                                    )).join(' ') + ' z'
-                                )).join(' ')
-                            }"/>`
-                        ));
-                    }
-                });
                 const data_min = color_data.reduce((a, b) => a.map((el, i) => Math.min(el, b[i])));
                 const data_max = color_data.reduce((a, b) => a.map((el, i) => Math.max(el, b[i])));
                 return html`
@@ -564,6 +475,7 @@ class MapRenderer extends LitElement {
                         @mousedown="${this.handleDragStart}"
                         @touchstart="${this.handleTouchStart}"
                         @touchmove="${this.handleTouchMove}"
+                        @touchend="${this.handleTouchEnd}"
                     >
                         <div id="info-box-wrapper">
                             <div id="info-box-background"></div>
@@ -578,27 +490,11 @@ class MapRenderer extends LitElement {
                                 </div>
                             </div>
                         </div>
-                        <svg
-                            id="map"
-                            class="wrapping-svg"
-                            viewBox="${
-                                Math.round(MapRenderer.map(min[0], min[0], min[0] + total_diff, 0, max_size)) + ' ' + 
-                                Math.round(MapRenderer.map(min[1], min[1], min[1] + total_diff, 0, max_size)) + ' ' +
-                                Math.round(MapRenderer.map(max[0], min[0], min[0] + total_diff, 0, max_size)) + ' ' + 
-                                Math.round(MapRenderer.map(max[1], min[1], min[1] + total_diff, 0, max_size))
-                            }"
-                        >
-                            ${locations.map((loc, i) => (svg`
-                                <g class="geometry" style="${styleMap({
-                                    fill: `rgb(${colors[i][0]},${colors[i][1]},${colors[i][2]})`,
-                                })}" .location_data="${loc}"
-                                    @mousemove="${this.mouseMoveCallback}"
-                                    @mouseout="${this.mouseOutCallback}"
-                                >
-                                    ${loc?.svg}
-                                </g>
-                            `))}
-                        </svg>
+                        <map-backend
+                            id="map-backend"
+                            .locations="${locations}"
+                            @hover="${this.handleLocationHover}"
+                        ></map-backend>
                     </div>
                     <div class="title">${data.title}</div>
                     <div id="map-legend">${

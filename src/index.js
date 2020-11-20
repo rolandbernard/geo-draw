@@ -9,17 +9,17 @@ window.addEventListener('load', () => {
     const main = document.querySelector('main');
     const router = new Router(main);
     router.add('#/?(edit(/(.*))?)?', html`<editing-view></editing-view>`, () => {
-        import(/* webpackChunkName: "editing" */ './editing-view');
+        import(/* webpackChunkName: "editing" */ './view/editing-view');
     });
     router.add('#/?view/(.+)', html`<display-view></display-view>`, () => {
-        import(/* webpackChunkName: "display" */ './display-view');
+        import(/* webpackChunkName: "display" */ './view/display-view');
     });
     router.add('#/?demo/(.+)', html`<demo-view></demo-view>`, () => {
-        import(/* webpackChunkName: "demo" */ './demo-view');
+        import(/* webpackChunkName: "demo" */ './view/demo-view');
     });
     router.default(html`<not-found-view></not-found-view>`, () => {
         window.location.hash = '#/404';
-        import(/* webpackChunkName: "not-found" */ './not-found-view');
+        import(/* webpackChunkName: "not-found" */ './view/not-found-view');
     });
     router.init();
 });
