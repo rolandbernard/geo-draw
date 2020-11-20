@@ -9,6 +9,8 @@ import FillVertexShader from './shaders/fill-vertex-shader.glsl';
 import StrokeFragmentShader from './shaders/stroke-fragment-shader.glsl';
 import StrokeVertexShader from './shaders/stroke-vertex-shader.glsl';
 
+const location_data_cache = {};
+
 class MapBackendWebGl extends LitElement {
 
     static get properties() {
@@ -63,12 +65,12 @@ class MapBackendWebGl extends LitElement {
         const map_pos = map.getBoundingClientRect();
         const [_, scale] = this.generateTranslateAndScale();
         const client_pos_norm = [
-            2 * client_pos[0] / this.current_size[0] - 1.0,
-            1.0 - 2 * client_pos[1] / this.current_size[1],
+            2 * (client_pos[0] - map_pos.x) / map_pos.width - 1.0,
+            1.0 - 2 * (client_pos[1] - map_pos.y) / map_pos.height,
         ];
         return [
-            client_pos_norm[0] / scale[0] - map_pos.x + this.zoom_center[0],
-            client_pos_norm[1] / scale[1] - map_pos.y + this.zoom_center[1],
+            client_pos_norm[0] / scale[0] + this.zoom_center[0],
+            client_pos_norm[1] / scale[1] + this.zoom_center[1],
         ];
     }
 
@@ -77,12 +79,12 @@ class MapBackendWebGl extends LitElement {
         const map_pos = map.getBoundingClientRect();
         const [transform, scale] = this.generateTranslateAndScale();
         const client_pos_norm = [
-            2 * client_pos[0] / map_pos.width - 1.0,
-            1.0 - 2 * client_pos[1] / map_pos.height,
+            2 * (client_pos[0] - map_pos.x) / map_pos.width - 1.0,
+            1.0 - 2 * (client_pos[1] - map_pos.y) / map_pos.height,
         ];
         return [
-            client_pos_norm[0] / scale[0] - map_pos.x - transform[0],
-            client_pos_norm[1] / scale[1] - map_pos.y - transform[1],
+            client_pos_norm[0] / scale[0] - transform[0],
+            client_pos_norm[1] / scale[1] - transform[1],
         ];
     }
     
@@ -91,20 +93,21 @@ class MapBackendWebGl extends LitElement {
         const map_pos = map.getBoundingClientRect();
         const [transform, scale] = this.generateTranslateAndScale();
         const client_pos_norm = [
-            (location_pos[0] + transform[0] + map_pos.x) * scale[0],
-            (location_pos[1] + transform[1] + map_pos.y) * scale[1],
+            (location_pos[0] + transform[0]) * scale[0],
+            (location_pos[1] + transform[1]) * scale[1],
         ];
         return [
-            (client_pos_norm[0] + 1.0) / 2 * map_pos.width,
-            (1.0 - client_pos_norm[1]) / 2 * map_pos.height,
+            (client_pos_norm[0] + 1.0) / 2 * map_pos.width + map_pos.x,
+            (1.0 - client_pos_norm[1]) / 2 * map_pos.height + map_pos.y,
         ];
     }
 
     handleMouseMove(event) {
         const pos = this.clientPosToLocationPos([event.clientX, event.clientY]);
-        for(const location of this.locations) {
-            if(location.min[0] <= pos[0] && location.min[1] <= pos[1] &&
-                location.max[0] >= pos[0] && location.max[1] >= pos[1]) {
+        for(const loc of this.locations) {
+            if(loc.min[0] <= pos[0] && loc.min[1] <= pos[1] &&
+                loc.max[0] >= pos[0] && loc.max[1] >= pos[1]) {
+                const location = location_data_cache[loc.id];
                 for(const polygon of location.polygons) {
                     if(polygon.min[0] <= pos[0] && polygon.min[1] <= pos[1] &&
                         polygon.max[0] >= pos[0] && polygon.max[1] >= pos[1]) {
@@ -130,9 +133,9 @@ class MapBackendWebGl extends LitElement {
                             const has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
                             const has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
                             if(!(has_neg && has_pos)) {
-                                this.current_hover = location;
+                                this.current_hover = loc.id;
                                 const my_event = new Event('hover');
-                                my_event.location = location;
+                                my_event.location = loc;
                                 my_event.position = this.locationPosToClientPos([
                                     (polygon.min[0] + polygon.max[0]) / 2,
                                     (polygon.min[1] + polygon.max[1]) / 2
@@ -215,7 +218,8 @@ class MapBackendWebGl extends LitElement {
             gl.clearColor(0.0, 0.0, 0.0, 0.0);
             gl.clear(gl.COLOR_BUFFER_BIT);
             
-            for(const location of this.locations) {
+            for(const loc of this.locations) {
+                const location = location_data_cache[loc.id];
                 // Draw stroke
                 gl.useProgram(stroke_data.shader_program);
                 gl.uniform2fv(stroke_data.translate_uniform, translate);
@@ -242,10 +246,10 @@ class MapBackendWebGl extends LitElement {
                 gl.useProgram(fill_data.shader_program);
                 gl.uniform2fv(fill_data.translate_uniform, translate);
                 gl.uniform2fv(fill_data.scale_uniform, scale);
-                if(location === this.current_hover) {
-                    gl.uniform3fv(fill_data.color_uniform, location.color.map(el => el * 0.8));
+                if(loc.id === this.current_hover) {
+                    gl.uniform3fv(fill_data.color_uniform, loc.color.map(el => el * 0.8));
                 } else {
-                    gl.uniform3fv(fill_data.color_uniform, location.color);
+                    gl.uniform3fv(fill_data.color_uniform, loc.color);
                 }
                 for(const polygon of location.polygons) {    
                     gl.bindBuffer(gl.ARRAY_BUFFER, polygon.gl_position_buffer);
@@ -300,7 +304,7 @@ class MapBackendWebGl extends LitElement {
         const stroke_color_uniform = gl.getUniformLocation(stroke_shader_program, 'uStrokeColor');
 
         for(const location of this.locations) {
-            for(const polygon of location.polygons) {
+            for(const polygon of location_data_cache[location.id].polygons) {
                 const position_buffer = gl.createBuffer();
                 gl.bindBuffer(gl.ARRAY_BUFFER, position_buffer);
                 gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(polygon.vertices), gl.STATIC_DRAW);
@@ -359,55 +363,58 @@ class MapBackendWebGl extends LitElement {
         this.min = min;
         this.max = max;
         this.locations.forEach(loc => {
-            if(loc) {
-                loc.color = loc.color.map(el => el / 255);
-                loc.polygons = loc.coords.map(poly => {
-                    const data = earcut.flatten(poly);
-                    const triangles = earcut(data.vertices, data.holes, data.dimensions);
-                    return {
-                        coords: poly,
-                        vertices: data.vertices,
-                        triangles: triangles,
-                        outline_vertices: poly.map(part => (
-                            part.reduce((arr,coord) => arr.concat([coord, coord, coord, coord]), [])
-                                .concat([part[0], part[0], part[0], part[0]])
-                        )).flat(3),
-                        outline_normals: poly.map(part => (
-                            part.reduce((arr,coord,i) => {
-                                const last = part[(part.length + i - 1) % part.length];
-                                const from_last = [coord[0] - last[0], coord[1] - last[1]];
-                                const next = part[(i + 1) % part.length];
-                                const to_next = [next[0] - coord[0], next[1] - coord[1]];
-                                return arr.concat([
-                                    [from_last[1], -from_last[0]],
-                                    [-from_last[1], from_last[0]],
-                                    [to_next[1], -to_next[0]],
-                                    [-to_next[1], to_next[0]],
-                                ]);
-                            }, []).concat((() => {
-                                const coord = part[0]
-                                const last = part[part.length - 1];
-                                const from_last = [coord[0] - last[0], coord[1] - last[1]];
-                                const next = part[1];
-                                const to_next = [next[0] - coord[0], next[1] - coord[1]];
-                                return [
-                                    [from_last[1], -from_last[0]],
-                                    [-from_last[1], from_last[0]],
-                                    [to_next[1], -to_next[0]],
-                                    [-to_next[1], to_next[0]],
-                                ];
-                            })())
-                        )).flat(3),
-                        min: poly.flat().reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
-                        max: poly.flat().reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
-                    }
-                });
+            loc.color = loc.color.map(el => el / 255);
+            if(loc && !location_data_cache[loc.id]) {
+                location_data_cache[loc.id] = {
+                    polygons: loc.coords.map(poly => {
+                        const data = earcut.flatten(poly);
+                        const triangles = earcut(data.vertices, data.holes, data.dimensions);
+                        return {
+                            coords: poly,
+                            vertices: data.vertices,
+                            triangles: triangles,
+                            outline_vertices: poly.map(part => (
+                                part.reduce((arr,coord) => arr.concat([coord, coord, coord, coord]), [])
+                                    .concat([part[0], part[0], part[0], part[0]])
+                            )).flat(3),
+                            outline_normals: poly.map(part => (
+                                part.reduce((arr,coord,i) => {
+                                    const last = part[(part.length + i - 1) % part.length];
+                                    const from_last = [coord[0] - last[0], coord[1] - last[1]];
+                                    const next = part[(i + 1) % part.length];
+                                    const to_next = [next[0] - coord[0], next[1] - coord[1]];
+                                    return arr.concat([
+                                        [from_last[1], -from_last[0]],
+                                        [-from_last[1], from_last[0]],
+                                        [to_next[1], -to_next[0]],
+                                        [-to_next[1], to_next[0]],
+                                    ]);
+                                }, []).concat((() => {
+                                    const coord = part[0]
+                                    const last = part[part.length - 1];
+                                    const from_last = [coord[0] - last[0], coord[1] - last[1]];
+                                    const next = part[1];
+                                    const to_next = [next[0] - coord[0], next[1] - coord[1]];
+                                    return [
+                                        [from_last[1], -from_last[0]],
+                                        [-from_last[1], from_last[0]],
+                                        [to_next[1], -to_next[0]],
+                                        [-to_next[1], to_next[0]],
+                                    ];
+                                })())
+                            )).flat(3),
+                            min: poly.flat().reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
+                            max: poly.flat().reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
+                        }
+                    }),
+                };
             }
         });
         return html`
             <canvas
                 id="map"
                 @mousemove="${this.handleMouseMove}"
+                @wheel="${this.handleMouseMove}"
                 @mouseout="${this.handleMouseOut}"
                 @touchstart="${this.handleTouchStart}"
             >

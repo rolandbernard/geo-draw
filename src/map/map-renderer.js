@@ -411,6 +411,7 @@ class MapRenderer extends LitElement {
                                 part.map(([lon, lat]) => MapRenderer.project([lon / 1e7, lat / 1e7]))
                             )));
                             location_cache[location] = {
+                                id: location,
                                 name: data.name,
                                 min: data.coords.flat(2).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
                                 max: data.coords.flat(2).reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
