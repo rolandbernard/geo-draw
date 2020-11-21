@@ -357,39 +357,47 @@ class MapRenderer extends LitElement {
 
     handleTouchStart(event) {
         event.preventDefault();
-        if(event.touches.length == 2) {
-            const touch_array = [[event.touches[0].clientX, event.touches[0].clientY], [event.touches[1].clientX, event.touches[1].clientY]];
-            this.avg_touch_pos = [(touch_array[0][0] + touch_array[1][0]) / 2, (touch_array[0][1] + touch_array[1][1]) / 2]
-            const diff = [touch_array[0][0] - touch_array[1][0], touch_array[0][1] - touch_array[1][1]];
-            this.touch_dist = (diff[0]*diff[0] + diff[1]*diff[1]);
+        if(event.touches.length == 2 || event.touches.length == 1) {
+            this.avg_touch_pos = Array.from(event.touches)
+                .map(touch => [touch.clientX, touch.clientY])
+                .reduce((a, b) => [a[0] + b[0], a[1] + b[1]]).map(el => el / event.touches.length);
+            if(event.touches.length == 2) {
+                const touch_array = [[event.touches[0].clientX, event.touches[0].clientY], [event.touches[1].clientX, event.touches[1].clientY]];
+                const diff = [touch_array[0][0] - touch_array[1][0], touch_array[0][1] - touch_array[1][1]];
+                this.touch_dist = (diff[0]*diff[0] + diff[1]*diff[1]);
+            }
         }
     }
 
     handleTouchMove(event) {
         event.preventDefault();
-        if(event.touches.length == 2) {
+        if(event.touches.length == 2 || event.touches.length == 1) {
             const map = this.shadowRoot.getElementById('map-backend');
-            const touch_array = [[event.touches[0].clientX, event.touches[0].clientY], [event.touches[1].clientX, event.touches[1].clientY]];
             // Translation
-            const new_touch_pos = [(touch_array[0][0] + touch_array[1][0]) / 2, (touch_array[0][1] + touch_array[1][1]) / 2]
+            const new_touch_pos = Array.from(event.touches)
+                .map(touch => [touch.clientX, touch.clientY])
+                .reduce((a, b) => [a[0] + b[0], a[1] + b[1]]).map(el => el / event.touches.length);
             const last_map_pos = map.clientPosToMapPos(this.avg_touch_pos);
             this.avg_touch_pos = new_touch_pos;
             const current_map_pos = map.clientPosToMapPos([new_touch_pos[0], new_touch_pos[1]]);
             const diff = [current_map_pos[0] - last_map_pos[0], current_map_pos[1] - last_map_pos[1]];
             let new_center = [map.center[0] - diff[0], map.center[1] - diff[1]];
-            // Scaling
             let new_scale = map.scale;
-            const touch_diff = [touch_array[0][0] - touch_array[1][0], touch_array[0][1] - touch_array[1][1]];
-            const new_touch_dist = (touch_diff[0]*touch_diff[0] + touch_diff[1]*touch_diff[1]);
-            if(this.touch_dist !== 0 && new_touch_dist !== 0) {
-                new_scale *= new_touch_dist / this.touch_dist;
-                this.touch_dist = new_touch_dist;
-                new_scale = Math.min(Math.max(MIN_ZOOM, new_scale), MAX_ZOOM);
-                const ds = new_scale / map.scale;
-                const pointer = map.clientPosToMapPos(new_touch_pos);
-                const delta = [(pointer[0] - new_center[0]) * (1 - 1 / ds), (pointer[1] - new_center[1]) * (1 - 1 / ds)];
-                new_center[0] += delta[0];
-                new_center[1] += delta[1];
+            if(event.touches.length == 2) {
+                // Scaling
+                const touch_array = [[event.touches[0].clientX, event.touches[0].clientY], [event.touches[1].clientX, event.touches[1].clientY]];
+                const touch_diff = [touch_array[0][0] - touch_array[1][0], touch_array[0][1] - touch_array[1][1]];
+                const new_touch_dist = (touch_diff[0]*touch_diff[0] + touch_diff[1]*touch_diff[1]);
+                if(this.touch_dist !== 0 && new_touch_dist !== 0) {
+                    new_scale *= new_touch_dist / this.touch_dist;
+                    this.touch_dist = new_touch_dist;
+                    new_scale = Math.min(Math.max(MIN_ZOOM, new_scale), MAX_ZOOM);
+                    const ds = new_scale / map.scale;
+                    const pointer = map.clientPosToMapPos(new_touch_pos);
+                    const delta = [(pointer[0] - new_center[0]) * (1 - 1 / ds), (pointer[1] - new_center[1]) * (1 - 1 / ds)];
+                    new_center[0] += delta[0];
+                    new_center[1] += delta[1];
+                }
             }
             map.setCenterAndScale(new_center, new_scale);
         }
@@ -397,6 +405,9 @@ class MapRenderer extends LitElement {
     
     handleTouchEnd(event) {
         event.preventDefault();
+        this.avg_touch_pos = Array.from(event.touches)
+            .map(touch => [touch.clientX, touch.clientY])
+            .reduce((a, b) => [a[0] + b[0], a[1] + b[1]]).map(el => el / event.touches.length);
     }
    
     static getLocations(locations) {
