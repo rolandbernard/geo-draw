@@ -163,6 +163,7 @@ class MapBackendSvg extends LitElement {
                 @wheel="${this.handleMouseMove}"
                 @mouseout="${this.handleMouseOut}"
                 @touchstart="${this.handleTouchStart}"
+                @touchmove="${this.handleTouchStart}"
             >
                 ${this.locations.map((loc) => (svg`
                     <g

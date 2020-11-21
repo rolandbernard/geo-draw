@@ -169,7 +169,7 @@ class MapBackendWebGl extends LitElement {
             this.handleMouseOut(event);
         }
     }
-
+    
     generateTranslateAndScale() {
         const width = this.max[0] - this.min[0];
         const height = this.max[1] - this.min[1];
@@ -417,6 +417,7 @@ class MapBackendWebGl extends LitElement {
                 @wheel="${this.handleMouseMove}"
                 @mouseout="${this.handleMouseOut}"
                 @touchstart="${this.handleTouchStart}"
+                @touchmove="${this.handleTouchStart}"
             >
             </canvas>
         `;
