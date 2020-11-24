@@ -284,22 +284,35 @@ class MapRenderer extends LitElement {
                 el.innerText = (Math.round(event.location.data[i] * 100) / 100).toLocaleString();
             });
             const map_wrapper_pos = map_wrapper.getBoundingClientRect();
-            const x = Math.min(Math.max(event.position[0] - map_wrapper_pos.x, 18.5), map_wrapper_pos.width - 18.5);
-            const y = Math.min(Math.max(event.position[1] - map_wrapper_pos.y, 10), map_wrapper_pos.height - 10);
-            info_box.style.left = x + 'px';
-            info_box.style.top = y + 'px';
-            info_box.classList.add('visible');
-            info_box.current_location = location;
-            if (x == 18.5) {
-                info_box.style.setProperty('--anchor-point', '0%');
-                info_box.style.setProperty('--anchor-at-bottom', (y / map_wrapper_pos.height * 0.8 + 0.1));
-            } else if (x == map_wrapper_pos.width - 18.5) {
-                info_box.style.setProperty('--anchor-point', '100%');
-                info_box.style.setProperty('--anchor-at-bottom', (y / map_wrapper_pos.height * 0.8 + 0.1));
-            } else {
+            let x = event.position[0] - map_wrapper_pos.x;
+            let y = event.position[1] - map_wrapper_pos.y;
+            {
+                const y = Math.min(Math.max(y, 0), map_wrapper_pos.height);
                 info_box.style.setProperty('--anchor-point', (x / map_wrapper_pos.width * 90 + 5) + '%');
                 info_box.style.setProperty('--anchor-at-bottom', (y > ((info_box.clientHeight + 12) * 1.2)) ? 1 : 0);
             }
+            info_box.style.left = x + 'px';
+            info_box.style.top = y + 'px';
+            info_box.classList.add('visible');
+            const info_box_pos = info_box.getBoundingClientRect();
+            if (info_box_pos.x < 4) {
+                x = Math.max(x, 8.5);
+                y = Math.min(Math.max(y, info_box_pos.height * 0.1), map_wrapper_pos.height - info_box_pos.height * 0.1);
+                info_box.style.setProperty('--anchor-point', '0%');
+                info_box.style.setProperty('--anchor-at-bottom', (y / map_wrapper_pos.height * 0.8 + 0.1));
+            } else if (info_box_pos.x + info_box_pos.width + 4 > map_wrapper_pos.x + map_wrapper_pos.width) {
+                x = Math.min(x, map_wrapper_pos.width - 8.5);
+                y = Math.min(Math.max(y, info_box_pos.height * 0.1), map_wrapper_pos.height - info_box_pos.height * 0.1);
+                info_box.style.setProperty('--anchor-point', '100%');
+                info_box.style.setProperty('--anchor-at-bottom', (y / map_wrapper_pos.height * 0.8 + 0.1));
+            } else {
+                y = Math.min(Math.max(y, 0), map_wrapper_pos.height);
+                info_box.style.setProperty('--anchor-point', (x / map_wrapper_pos.width * 90 + 5) + '%');
+                info_box.style.setProperty('--anchor-at-bottom', (y > ((info_box_pos.height + 12) * 1.2)) ? 1 : 0);
+            }
+            info_box.style.left = x + 'px';
+            info_box.style.top = y + 'px';
+            info_box.current_location = location;
         } else {
             const info_box = this.shadowRoot.getElementById('info-box-wrapper');
             info_box.classList.remove('visible');
