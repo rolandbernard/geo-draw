@@ -167,12 +167,15 @@ class MapRenderer extends LitElement {
                 pointer-events: none;
             }
             div.current-legend {
-                display: grid;
-                grid-template-columns: auto auto;
-                grid-gap: 0.5rem;
+                display: flex;
+                flex-flow: row nowrap;
                 align-items: center;
+                justify-content: flex-end;
                 text-align: right;
                 padding: 0.5rem;
+            }
+            div.current-legend span {
+                margin: 0.25rem;
             }
             select.select-option {
                 pointer-events: all;
@@ -183,6 +186,7 @@ class MapRenderer extends LitElement {
                 padding: 0.35rem;
                 border-radius: 4px;
                 text-align: center;
+                text-align-last: center;
             }
             select.select-option:hover {
                 cursor: pointer;
@@ -548,16 +552,27 @@ class MapRenderer extends LitElement {
                     <div id="map-legend">
                         <div class="current-legend">
                         ${
+                            data.options
+                                ? null
+                                : color_data?.[0]?.length > 1
+                                    ? (data.colors.map((_, i) => (html`
+                                            <span class="legend-label">${data.color_using ? data.columns[data.color_using[i]] : data.color_using[i]}</span>
+                                    ` )))
+                                    : data.colors.length >= 1
+                                        ? html`
+                                            <span class="legend-label">${data.color_using ? data.columns[data.color_using[0]] : data.color_using[0]}</span>
+                                        `
+                                        : null
+                        }
+                        ${
                             color_data?.[0]?.length > 1
-                                ? (data.colors.map((col, i) => (html`
-                                    <span class="legend-label">${data.color_using ? data.columns[data.color_using[i]] : data.color_using[i]}</span>
+                                ? (data.colors.map((col) => (html`
                                     <span class="color-block" style="${styleMap({
-                                    background: col,
-                                })}"></span>
+                                        background: col,
+                                    })}"></span>
                                 ` )))
                                 : (data.colors.length >= 1
                                     ? (html`
-                                        <span class="legend-label">${data.color_using ? data.columns[data.color_using[0]] : data.color_using[0]}</span>
                                         <span class="color-gradiant">
                                             <span>${(Math.round(data_max[0] * 100) / 100).toLocaleString()}</span>
                                             <span class="scale" style="${styleMap({
