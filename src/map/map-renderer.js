@@ -174,8 +174,8 @@ class MapRenderer extends LitElement {
                 text-align: right;
                 padding: 0.5rem;
             }
-            div.current-legend span {
-                margin: 0.25rem;
+            span.color-gradiant, span.color-block {
+                margin-left: 0.5rem;
             }
             select.select-option {
                 pointer-events: all;
