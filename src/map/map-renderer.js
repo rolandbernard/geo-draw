@@ -173,6 +173,7 @@ class MapRenderer extends LitElement {
                 justify-content: flex-end;
                 text-align: right;
                 padding: 0.5rem;
+                text-shadow: black 0px 0px 10px;
             }
             span.color-gradiant, span.color-block {
                 margin-left: 0.5rem;
