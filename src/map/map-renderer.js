@@ -164,6 +164,7 @@ class MapRenderer extends LitElement {
                 font-family: Roboto, sans-serif;
                 display: flex;
                 flex-flow: column;
+                pointer-events: none;
             }
             div.current-legend {
                 display: grid;
@@ -171,7 +172,6 @@ class MapRenderer extends LitElement {
                 grid-gap: 0.5rem;
                 align-items: center;
                 text-align: right;
-                pointer-events: none;
                 padding: 0.5rem;
             }
             select.select-option {
