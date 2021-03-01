@@ -46,7 +46,7 @@ class MapBackendWebGl extends LitElement {
         this.max = [0, 0];
         this.current_hover = null;
     }
-    
+
     get center() {
         return this.zoom_center;
     }
@@ -355,6 +355,28 @@ class MapBackendWebGl extends LitElement {
             },
         };
         this.renderMapInCanvas();
+    }
+
+    disconnectedCallback() {
+        if (this.webgl_data?.context) {
+            const gl = this.webgl_data.context;
+            for (const location of this.locations) {
+                for (const polygon of location_data_cache[location.id].polygons) {
+                    gl.deleteBuffer(polygon.gl_position_buffer);
+                    gl.deleteBuffer(polygon.gl_index_buffer);
+                    gl.deleteBuffer(polygon.gl_outline_position_buffer);
+                    gl.deleteBuffer(polygon.gl_outline_normal_buffer);
+                }
+            }
+            gl.getAttachedShaders(this.webgl_data.fill_data.shader_program).forEach(s => {
+                gl.deleteShader(s);
+            });
+            gl.deleteProgram(this.webgl_data.fill_data.fill_shader_program);
+            gl.getAttachedShaders(this.webgl_data.stroke_data.shader_program).forEach(s => {
+                gl.deleteShader(s);
+            });
+            gl.deleteProgram(this.webgl_data.stroke_data.shader_program);
+        }
     }
     
     render() {
