@@ -4,6 +4,7 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const CleanWebpackPlugin = require('clean-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+const CreateFileWebpack = require('create-file-webpack');
 
 const webcomponentsjs = './node_modules/@webcomponents/webcomponentsjs';
 
@@ -48,6 +49,7 @@ const plugins = [
         ignore: ['.DS_Store']
     }),
     new MiniCssExtractPlugin(),
+    new CreateFileWebpack({ path: 'dist', fileName: '.nojekyll', content: '' }),
 ];
 
 module.exports = {
