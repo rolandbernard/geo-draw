@@ -165,17 +165,25 @@ class MapRenderer extends LitElement {
                 display: flex;
                 flex-flow: column;
                 pointer-events: none;
+                align-items: flex-end;
             }
             div.current-legend {
                 display: flex;
-                flex-flow: row nowrap;
-                align-items: center;
-                justify-content: flex-end;
+                flex-flow: column;
                 text-align: right;
                 padding: 0.5rem;
                 text-shadow: black 0px 0px 10px;
             }
-            span.color-gradiant, span.color-block {
+            div.current-legend .legend-item {
+                display: flex;
+                flex-flow: row;
+                align-items: center;
+                justify-content: flex-start;
+            }
+            div.current-legend .color-block {
+                margin: 0 0.5rem;
+            }
+            div.current-legend .color-gradiant {
                 margin-left: 0.5rem;
             }
             select.select-option {
@@ -553,56 +561,55 @@ class MapRenderer extends LitElement {
                     <div id="map-legend">
                         <div class="current-legend">
                         ${
-                            data.options
-                                ? null
-                                : color_data?.[0]?.length > 1
-                                    ? (data.colors.map((_, i) => (html`
-                                            <span class="legend-label">${data.color_using ? data.columns[data.color_using[i]] : data.color_using[i]}</span>
-                                    ` )))
-                                    : data.colors.length >= 1
-                                        ? html`
-                                            <span class="legend-label">${data.color_using ? data.columns[data.color_using[0]] : data.color_using[0]}</span>
-                                        `
-                                        : null
-                        }
-                        ${
                             color_data?.[0]?.length > 1
-                                ? (data.colors.map((col) => (html`
-                                    <span class="color-block" style="${styleMap({
-                                        background: col,
-                                    })}"></span>
+                                ? (data.colors.map((col, i) => (html`
+                                    <div class="legend-item">
+                                        <span class="color-block" style="${styleMap({
+                                            background: col,
+                                        })}"></span>
+                                        <span class="legend-label">${data.color_using ? data.columns[data.color_using[i]] : data.color_using[i]}</span>
+                                    </div>
                                 ` )))
                                 : (data.colors.length >= 1
                                     ? (html`
-                                        <span class="color-gradiant">
-                                            <span>${(Math.round(data_max[0] * 100) / 100).toLocaleString()}</span>
-                                            <span class="scale" style="${styleMap({
-                                                background: `linear-gradient(${data.colors[0]},${data.defcolor})`,
-                                            })}"></span>
-                                            <span>${(Math.round(data_min[0] * 100) / 100).toLocaleString()}</span>
-                                        </span>
+                                        <div class="legend-item">
+                                            ${
+                                                data.options
+                                                    ? null
+                                                    : html`
+                                                        <span class="legend-label">${data.color_using ? data.columns[data.color_using[0]] : data.color_using[0]}</span>
+                                                    `
+                                            }
+                                            <span class="color-gradiant">
+                                                <span>${(Math.round(data_max[0] * 100) / 100).toLocaleString()}</span>
+                                                <span class="scale" style="${styleMap({
+                                                    background: `linear-gradient(${data.colors[0]},${data.defcolor})`,
+                                                })}"></span>
+                                                <span>${(Math.round(data_min[0] * 100) / 100).toLocaleString()}</span>
+                                            </span>
+                                        </div>
                                     `)
                                     : null
                                 )
                         }
                         </div>
-                    ${
-                        data.options
-                        ? html`
-                            <select
-                                class="select-option"
-                                @change="${this.handleOptionChange}"
-                            >${
-                                data.options.map((option, i) => html`
-                                    <option
-                                        value="${i}"
-                                        ?selected="${i == data.option_selected}"
-                                    >${option.name}</option>
-                                `)
-                            }</select>
-                        `
-                        : null
-                    }
+                        ${
+                            data.options
+                            ? html`
+                                <select
+                                    class="select-option"
+                                    @change="${this.handleOptionChange}"
+                                >${
+                                    data.options.map((option, i) => html`
+                                        <option
+                                            value="${i}"
+                                            ?selected="${i == data.option_selected}"
+                                        >${option.name}</option>
+                                    `)
+                                }</select>
+                            `
+                            : null
+                        }
                     </div>
                 `;
             } else {
