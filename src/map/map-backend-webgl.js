@@ -321,7 +321,7 @@ class MapBackendWebGl extends LitElement {
                 polygon.gl_outline_normal_buffer = outline_normal_buffer;
             }
         }
-        
+
         const handleResize = () => {
             canvas.width = canvas.clientWidth;
             canvas.height = canvas.clientHeight;
@@ -330,7 +330,7 @@ class MapBackendWebGl extends LitElement {
         }
         window.addEventListener('resize', handleResize);
         handleResize();
-        
+
         this.webgl_data = {
             canvas: canvas,
             context: gl,
@@ -376,8 +376,8 @@ class MapBackendWebGl extends LitElement {
             gl.deleteProgram(this.webgl_data.stroke_data.shader_program);
         }
     }
-    
-    render() {
+
+    buildRenderData() {
         const min = this.locations.filter(loc => loc).map(loc => loc.min).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]);
         const max = this.locations.filter(loc => loc).map(loc => loc.max).reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]);
         this.min = min;
@@ -430,6 +430,10 @@ class MapBackendWebGl extends LitElement {
                 };
             }
         });
+    }
+
+    render() {
+        this.buildRenderData();
         return html`
             <canvas
                 id="map"

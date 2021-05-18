@@ -55,17 +55,16 @@ class MapBackend3d extends LitElement {
     }
     
     clientPosToMapPos(client_pos) {
-        // const map = this.shadowRoot.getElementById('map');
-        // const map_pos = map.getBoundingClientRect();
-        // const [_, scale] = this.generateTranslateAndScale();
-        // const client_pos_norm = [
-        //     2 * (client_pos[0] - map_pos.x) / map_pos.width - 1.0,
-        //     1.0 - 2 * (client_pos[1] - map_pos.y) / map_pos.height,
-        // ];
-        // return [
-        //     client_pos_norm[0] / scale[0] + this.zoom_center[0],
-        //     client_pos_norm[1] / scale[1] + this.zoom_center[1],
-        // ];
+        const map = this.shadowRoot.getElementById('map');
+        const map_pos = map.getBoundingClientRect();
+        const client_pos_norm = [
+            2 * (client_pos[0] - map_pos.x) / map_pos.width - 1.0,
+            1.0 - 2 * (client_pos[1] - map_pos.y) / map_pos.height,
+        ];
+        return [
+            client_pos_norm[0] * this.zoom_scale + this.zoom_center[0],
+            client_pos_norm[1] * this.zoom_scale + this.zoom_center[1],
+        ];
     }
 
     clientPosToLocationPos(client_pos) {
@@ -163,24 +162,62 @@ class MapBackend3d extends LitElement {
         //     this.handleMouseOut(event);
         // }
     }
-    
-    generateTransform() {
+
+    generateScaleTransform() {
+        let scale;
+        if(this.current_size[0] < this.current_size[1]) {
+            scale = [
+                this.zoom_scale,
+                (this.current_size[0] / this.current_size[1]) * this.zoom_scale,
+            ];
+        } else {
+            scale = [
+                (this.current_size[1] / this.current_size[0]) * this.zoom_scale,
+                this.zoom_scale,
+            ];
+        }
         return [
-            1, 0, 0, 0,
-            0, 1, 0, 0,
+            scale[0], 0, 0, 0,
+            0, scale[1], 0, 0,
             0, 0, 1, 0,
             0, 0, 0, 1,
         ];
     }
 
+    generateTransform() {
+        const scale_transform = this.generateScaleTransform();
+        const alpha = 0;
+        const beta = -this.zoom_center[0] - Math.PI / 2;
+        const gamma = this.zoom_center[1];
+        return [
+            Math.cos(alpha) * Math.cos(beta) * scale_transform[0],
+            (Math.cos(alpha) * Math.sin(beta) * Math.sin(gamma) - Math.sin(alpha) * Math.cos(gamma)) * scale_transform[5],
+            (Math.cos(alpha) * Math.sin(beta) * Math.cos(gamma) + Math.sin(alpha) * Math.sin(gamma)) * scale_transform[10],
+            0,
+
+            Math.sin(alpha) * Math.cos(beta) * scale_transform[0],
+            (Math.sin(alpha) * Math.sin(beta) * Math.sin(gamma) + Math.cos(alpha) * Math.cos(gamma)) * scale_transform[5],
+            (Math.sin(alpha) * Math.sin(beta) * Math.cos(gamma) - Math.cos(alpha) * Math.sin(gamma)) * scale_transform[10],
+            0,
+
+            -Math.sin(beta) * scale_transform[0],
+            Math.cos(beta) * Math.sin(gamma) * scale_transform[5],
+            Math.cos(beta) * Math.cos(gamma) * scale_transform[10],
+            0,
+
+            0, 0, 0, 1,
+        ];
+    }
+
     renderMapInCanvas() {
-        if (this.last_center != this.zoom_center
+        if (true || this.last_center != this.zoom_center
             || this.last_scale != this.zoom_scale
             || this.last_hover != this.current_hover
             || this.last_size != this.current_size) {
             const gl = this.webgl_data.context;
             const fill_data = this.webgl_data.fill_data;
             const transform = this.generateTransform();
+            const scale_transform = this.generateScaleTransform();
 
             gl.clearColor(0.0, 0.0, 0.0, 0.0);
             gl.clearDepth(1);
@@ -206,6 +243,17 @@ class MapBackend3d extends LitElement {
                     gl.drawElements(gl.TRIANGLES, polygon.triangles.length, gl.UNSIGNED_SHORT, 0);
                 }
             }
+            // Draw sphere
+            gl.useProgram(fill_data.shader_program);
+            gl.uniform3fv(fill_data.color_uniform, [0, 0, 0.75]);
+            gl.uniformMatrix4fv(fill_data.transform_uniform, false, scale_transform);
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.sphere.gl_position_buffer);
+            gl.vertexAttribPointer(fill_data.position_attribute, 3, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(fill_data.position_attribute);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.sphere.gl_index_buffer);
+            gl.drawElements(gl.TRIANGLES, this.sphere.triangles.length, gl.UNSIGNED_SHORT, 0);
+
+            // Set last render values
             this.last_center = this.zoom_center;
             this.last_scale = this.zoom_scale;
             this.last_hover = this.current_hover;
@@ -259,7 +307,13 @@ class MapBackend3d extends LitElement {
                 polygon.gl_outline_normal_buffer = outline_normal_buffer;
             }
         }
-        
+        this.sphere.gl_position_buffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.sphere.gl_position_buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.sphere.vertecies), gl.STATIC_DRAW);
+        this.sphere.gl_index_buffer = gl.createBuffer();
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.sphere.gl_index_buffer);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(this.sphere.triangles), gl.STATIC_DRAW);
+
         const handleResize = () => {
             canvas.width = canvas.clientWidth;
             canvas.height = canvas.clientHeight;
@@ -268,7 +322,7 @@ class MapBackend3d extends LitElement {
         }
         window.addEventListener('resize', handleResize);
         handleResize();
-        
+
         this.webgl_data = {
             canvas: canvas,
             context: gl,
@@ -293,6 +347,8 @@ class MapBackend3d extends LitElement {
                     gl.deleteBuffer(polygon.gl_outline_normal_buffer);
                 }
             }
+            gl.deleteBuffer(this.sphere.gl_position_buffer);
+            gl.deleteBuffer(this.sphere.gl_index_buffer);
             gl.getAttachedShaders(this.webgl_data.fill_data.shader_program).forEach(s => {
                 gl.deleteShader(s);
             });
@@ -306,10 +362,10 @@ class MapBackend3d extends LitElement {
         const x = Math.cos(lat) * Math.cos(lon);
         const y = Math.cos(lat) * Math.sin(lon);
         const z = Math.sin(lat);
-        return [x, y, z];
+        return [x, z, y];
     }
 
-    render() {
+    buildRenderData() {
         this.locations.forEach(loc => {
             loc.raw_min = loc.raw_coords.flat(2).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]);
             loc.raw_max = loc.raw_coords.flat(2).reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]);
@@ -332,6 +388,23 @@ class MapBackend3d extends LitElement {
                 };
             }
         });
+        this.sphere = {
+            vertecies: [ 0, 0, 0 ],
+            triangles: [ ],
+        };
+        const N = 100;
+        for (let i = 0; i < N; i++) {
+            this.sphere.vertecies.push(Math.sin(2 * Math.PI * i / N), Math.cos(2 * Math.PI * i / N), 0);
+        }
+        for (let i = 0; i < N; i++) {
+            this.sphere.triangles.push(0, i + 1, (i + 1) % N + 1);
+        }
+        console.log(this.sphere.vertecies);
+        console.log(this.sphere.triangles);
+    }
+
+    render() {
+        this.buildRenderData();
         return html`
             <canvas
                 id="map"
