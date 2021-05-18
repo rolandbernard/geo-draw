@@ -2,8 +2,6 @@
 import { LitElement, html, css } from 'lit-element';
 import earcut from 'earcut';
 
-import { map } from '../util';
-
 import FillFragmentShader from './shaders/fill-fragment-shader.glsl';
 import FillVertexShader from './shaders/fill-vertex-shader.glsl';
 import StrokeFragmentShader from './shaders/stroke-fragment-shader.glsl';

@@ -1,5 +1,5 @@
 
-import { LitElement, html, svg, css } from 'lit-element';
+import { LitElement, html, css } from 'lit-element';
 import { styleMap } from 'lit-html/directives/style-map';
 import { until } from 'lit-html/directives/until';
 
@@ -7,6 +7,7 @@ import '../ui/spinner';
 import { map as mapFromTo, hasWebGlSupport } from '../util';
 if(hasWebGlSupport()) {
     import(/* webpackChunkName: "map-backend-webgl" */ './map-backend-webgl');
+    import(/* webpackChunkName: "map-backend-webgl" */ './map-backend-3d');
 } else {
     import(/* webpackChunkName: "map-backend-svg" */ './map-backend-svg');
 }
@@ -463,15 +464,16 @@ class MapRenderer extends LitElement {
                         const res = await fetch(`${data_location}/${location}.bin`);
                         if (res.ok) {
                             const data = MapRenderer.parseBinaryData(await res.arrayBuffer());
-                            data.coords = data.coords.map(poly => poly.map(part => (
+                            const coords = data.coords.map(poly => poly.map(part => (
                                 part.map(([lon, lat]) => MapRenderer.project([lon / 1e7, lat / 1e7]))
                             )));
                             location_cache[location] = {
                                 id: location,
                                 name: data.name,
-                                min: data.coords.flat(2).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
-                                max: data.coords.flat(2).reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
-                                coords: data.coords,
+                                min: coords.flat(2).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
+                                max: coords.flat(2).reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
+                                coords: coords,
+                                raw_coords: data.coords,
                             };
                         } else {
                             location_cache[location] = null;
@@ -551,11 +553,11 @@ class MapRenderer extends LitElement {
                                 </div>
                             </div>
                         </div>
-                        <map-backend
+                        <map-backend-3d
                             id="map-backend"
                             .locations="${locations}"
                             @hover="${this.handleLocationHover}"
-                        ></map-backend>
+                        ></map-backend-3d>
                     </div>
                     <div class="title">${data.title}</div>
                     <div id="map-legend">
