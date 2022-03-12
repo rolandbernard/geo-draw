@@ -7,7 +7,7 @@ import WebGLRenderer from './webgl-renderer';
 const TEXTURE_HEIGHT = 1024;
 const TEXTURE_WIDTH = 2048;
 
-const SPHERE_SEGMENTS = 5;
+const SPHERE_SEGMENTS = 50;
 
 export default class WebGLRenderer3d extends WebGLRenderer {
     clientPosToMapPos(client_pos, map_pos, state) {
@@ -65,6 +65,8 @@ export default class WebGLRenderer3d extends WebGLRenderer {
 
     initForContext(canvas, gl, locations) {
         super.initForContext(canvas, gl, locations);
+        gl.enable(gl.DEPTH_TEST);
+
         const texture_shader_program = this.createShaderProgram(gl, TexturedVertexShader, TexturedFragmentShader);
         const texture_position_attribute = gl.getAttribLocation(texture_shader_program, 'aVertexPosition');
         const texture_texcoord_attribute = gl.getAttribLocation(texture_shader_program, 'aTextureCoord');
@@ -83,12 +85,11 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         let vertex_count = 0;
         for (let j = 0; j < SPHERE_SEGMENTS; j++) {
             for (let i = 0; i < SPHERE_SEGMENTS; i++) {
-                const alpha = Math.PI * j / (SPHERE_SEGMENTS - 1);
+                const alpha = Math.PI * j / (SPHERE_SEGMENTS - 1) - Math.PI / 2;
                 const beta = 2 * Math.PI * i / SPHERE_SEGMENTS;
-                const cos = Math.cos(alpha);
-                sphere_vertices[vertex_count * 3 + 0] = cos * Math.cos(beta);
-                sphere_vertices[vertex_count * 3 + 1] = cos * Math.sin(beta);
-                sphere_vertices[vertex_count * 3 + 2] = Math.sin(alpha);
+                sphere_vertices[vertex_count * 3 + 0] = Math.cos(alpha) * Math.sin(beta);
+                sphere_vertices[vertex_count * 3 + 1] = Math.sin(alpha);
+                sphere_vertices[vertex_count * 3 + 2] = Math.cos(alpha) * Math.cos(beta);
                 sphere_texcoord[vertex_count * 2 + 0] = j / (SPHERE_SEGMENTS - 1);
                 sphere_texcoord[vertex_count * 2 + 1] = i / SPHERE_SEGMENTS;
                 vertex_count++;
@@ -98,12 +99,12 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         let triangle_count = 0;
         for (let j = 0; j < SPHERE_SEGMENTS - 1; j++) {
             for (let i = 0; i < SPHERE_SEGMENTS; i++) {
-                sphere_triangles[triangle_count * 6 + 0] = (j + 1) * SPHERE_SEGMENTS + i;
-                sphere_triangles[triangle_count * 6 + 1] = j * SPHERE_SEGMENTS + (i + 1) % SPHERE_SEGMENTS;
-                sphere_triangles[triangle_count * 6 + 2] = j * SPHERE_SEGMENTS + i;
-                sphere_triangles[triangle_count * 6 + 3] = (j + 1) * SPHERE_SEGMENTS + i;
-                sphere_triangles[triangle_count * 6 + 4] = (j + 1) * SPHERE_SEGMENTS + (i + 1) % SPHERE_SEGMENTS;
-                sphere_triangles[triangle_count * 6 + 5] = j * SPHERE_SEGMENTS + (i + 1) % SPHERE_SEGMENTS;
+                sphere_triangles[triangle_count * 3 + 0] = (j + 1) * SPHERE_SEGMENTS + i;
+                sphere_triangles[triangle_count * 3 + 1] = j * SPHERE_SEGMENTS + (i + 1) % SPHERE_SEGMENTS;
+                sphere_triangles[triangle_count * 3 + 2] = j * SPHERE_SEGMENTS + i;
+                sphere_triangles[triangle_count * 3 + 3] = (j + 1) * SPHERE_SEGMENTS + i;
+                sphere_triangles[triangle_count * 3 + 4] = (j + 1) * SPHERE_SEGMENTS + (i + 1) % SPHERE_SEGMENTS;
+                sphere_triangles[triangle_count * 3 + 5] = j * SPHERE_SEGMENTS + (i + 1) % SPHERE_SEGMENTS;
                 triangle_count += 2;
             }
         }
@@ -161,7 +162,7 @@ export default class WebGLRenderer3d extends WebGLRenderer {
                 size: [TEXTURE_WIDTH, TEXTURE_HEIGHT],
                 center: [3.141592653589793, 1.5707963267948966],
                 scale: 1
-            }, [0.1, 0.2, 0.5, 1.0]);
+            }, [0.0, 0.35, 0.53, 1.0]);
             gl.viewport(0, 0, this.webgl_data.canvas.clientWidth, this.webgl_data.canvas.clientHeight);
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
             this.last = { hover: state.hover };
