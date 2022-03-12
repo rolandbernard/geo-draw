@@ -82,8 +82,7 @@ class MapBackendWebGl extends LitElement {
         for(const loc of this.locations) {
             if(loc.min[0] <= pos[0] && loc.min[1] <= pos[1] &&
                 loc.max[0] >= pos[0] && loc.max[1] >= pos[1]) {
-                const location = loc.gl_data;
-                for(const polygon of location.polygons) {
+                for(const polygon of loc.triangles.polygons) {
                     if(polygon.min[0] <= pos[0] && polygon.min[1] <= pos[1] &&
                         polygon.max[0] >= pos[0] && polygon.max[1] >= pos[1]) {
                         for(let i = 0; i < polygon.triangles.length; i += 3) {
@@ -177,6 +176,39 @@ class MapBackendWebGl extends LitElement {
         this.renderer.deinitResources(this.locations);
     }
 
+    generateTriangles(location) {
+        const polygons = [];
+        const outline_vertices = [];
+        const outline_triangles = [];
+        let vertex_count = 0;
+        let triangle_count = 0;
+        for (const poly of location.coords) {
+            const data = earcut.flatten(poly);
+            const triangles = earcut(data.vertices, data.holes, data.dimensions);
+            vertex_count += data.vertices.length;
+            triangle_count += triangles.length;
+            polygons.push({
+                vertices: new Float32Array(data.vertices),
+                triangles: new Uint16Array(triangles),
+                min: poly.flat().reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
+                max: poly.flat().reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
+            });
+        }
+        const vertices = new Float32Array(vertex_count);
+        const triangles = new Uint16Array(triangle_count);
+        vertex_count = 0;
+        triangle_count = 0;
+        for (const poly of polygons) {
+            vertices.set(poly.vertices, vertex_count);
+            for (let i = 0; i < poly.triangles.length; i++) {
+                triangles[triangle_count + i] = vertex_count / 2 + poly.triangles[i];
+            }
+            vertex_count += poly.vertices.length;
+            triangle_count += poly.triangles.length;
+        }
+        return { polygons, vertices, triangles, outline_vertices, outline_triangles };
+    }
+
     buildRenderData() {
         const min = this.locations.filter(loc => loc).map(loc => loc.min).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]);
         const max = this.locations.filter(loc => loc).map(loc => loc.max).reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]);
@@ -186,51 +218,9 @@ class MapBackendWebGl extends LitElement {
             loc.color = loc.color.map(el => el / 255);
             if (loc) {
                 if (!location_data_cache[loc.id]) {
-                    location_data_cache[loc.id] = {
-                        polygons: loc.coords.map(poly => {
-                            const data = earcut.flatten(poly);
-                            const triangles = earcut(data.vertices, data.holes, data.dimensions);
-                            return {
-                                coords: poly,
-                                vertices: data.vertices,
-                                triangles: triangles,
-                                outline_vertices: poly.map(part => (
-                                    part.reduce((arr, coord) => arr.concat([coord, coord, coord, coord]), [])
-                                        .concat([part[0], part[0], part[0], part[0]])
-                                )).flat(3),
-                                outline_normals: poly.map(part => (
-                                    part.reduce((arr, coord, i) => {
-                                        const last = part[(part.length + i - 1) % part.length];
-                                        const from_last = [coord[0] - last[0], coord[1] - last[1]];
-                                        const next = part[(i + 1) % part.length];
-                                        const to_next = [next[0] - coord[0], next[1] - coord[1]];
-                                        return arr.concat([
-                                            [from_last[1], -from_last[0]],
-                                            [-from_last[1], from_last[0]],
-                                            [to_next[1], -to_next[0]],
-                                            [-to_next[1], to_next[0]],
-                                        ]);
-                                    }, []).concat((() => {
-                                        const coord = part[0]
-                                        const last = part[part.length - 1];
-                                        const from_last = [coord[0] - last[0], coord[1] - last[1]];
-                                        const next = part[1];
-                                        const to_next = [next[0] - coord[0], next[1] - coord[1]];
-                                        return [
-                                            [from_last[1], -from_last[0]],
-                                            [-from_last[1], from_last[0]],
-                                            [to_next[1], -to_next[0]],
-                                            [-to_next[1], to_next[0]],
-                                        ];
-                                    })())
-                                )).flat(3),
-                                min: poly.flat().reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
-                                max: poly.flat().reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
-                            }
-                        }),
-                    };
+                    location_data_cache[loc.id] = this.generateTriangles(loc);
                 }
-                loc.gl_data = location_data_cache[loc.id];
+                loc.triangles = location_data_cache[loc.id];
             }
         });
     }
