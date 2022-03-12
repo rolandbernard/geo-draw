@@ -178,11 +178,13 @@ class MapBackendWebGl extends LitElement {
 
     generateTriangles(location) {
         const polygons = [];
-        const outline_vertices = [];
-        const outline_triangles = [];
         let vertex_count = 0;
         let triangle_count = 0;
+        let outline_count = 0;
         for (const poly of location.coords) {
+            for (const part of poly) {
+                outline_count += part.length;
+            }
             const data = earcut.flatten(poly);
             const triangles = earcut(data.vertices, data.holes, data.dimensions);
             vertex_count += data.vertices.length;
@@ -206,7 +208,29 @@ class MapBackendWebGl extends LitElement {
             vertex_count += poly.vertices.length;
             triangle_count += poly.triangles.length;
         }
-        return { polygons, vertices, triangles, outline_vertices, outline_triangles };
+        const outline_triangles = new Float32Array(outline_count * 3 * 2 * 2);
+        const outline_normals = new Float32Array(outline_count * 3 * 2 * 2);
+        outline_count = 0;
+        for (const poly of location.coords) {
+            for (const part of poly) {
+                for (let i = 0; i < part.length; i++) {
+                    const curr = part[i];
+                    const next = part[(i + 1) % part.length];
+                    const to_next = [next[0] - curr[0], next[1] - curr[1]];
+                    const offset = outline_count * 12 + i * 12;
+                    outline_triangles.set([
+                        curr[0], curr[1],   curr[0], curr[1],   next[0], next[1], 
+                        curr[0], curr[1],   next[0], next[1],   next[0], next[1],
+                    ], offset);
+                    outline_normals.set([
+                        to_next[1], -to_next[0],   -to_next[1], to_next[0],   to_next[1], -to_next[0],
+                        -to_next[1], to_next[0],   -to_next[1], to_next[0],   to_next[1], -to_next[0],
+                    ], offset)
+                }
+                outline_count += part.length;
+            }
+        }
+        return { polygons, vertices, triangles, outline_triangles, outline_normals };
     }
 
     buildRenderData() {
