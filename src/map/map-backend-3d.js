@@ -365,6 +365,14 @@ class MapBackend3d extends LitElement {
         return [x, z, y];
     }
 
+    static project_array(array) {
+        const result = [];
+        for (let i = 0; i < array.length; i += 2) {
+            result.push(...MapBackend3d.project([array[i], array[i + 1]]));
+        }
+        return result;
+    }
+
     buildRenderData() {
         this.locations.forEach(loc => {
             loc.raw_min = loc.raw_coords.flat(2).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]);
@@ -373,13 +381,12 @@ class MapBackend3d extends LitElement {
             if(loc && !location_data_cache[loc.id]) {
                 location_data_cache[loc.id] = {
                     polygons: loc.raw_coords
-                        .map(poly => poly.map(part => part.map(MapBackend3d.project)))
                         .map(poly => {
                             const data = earcut.flatten(poly);
                             const triangles = earcut(data.vertices, data.holes, data.dimensions);
                             return {
                                 coords: poly,
-                                vertices: data.vertices,
+                                vertices: MapBackend3d.project_array(data.vertices),
                                 triangles: triangles,
                                 min: poly.flat().reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
                                 max: poly.flat().reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
@@ -399,8 +406,6 @@ class MapBackend3d extends LitElement {
         for (let i = 0; i < N; i++) {
             this.sphere.triangles.push(0, i + 1, (i + 1) % N + 1);
         }
-        console.log(this.sphere.vertecies);
-        console.log(this.sphere.triangles);
     }
 
     render() {
