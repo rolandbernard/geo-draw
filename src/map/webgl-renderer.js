@@ -74,29 +74,29 @@ export default class WebGLRenderer {
             return [translate, scale, stroke_scale];
         }
     }
+    
+    createShaderProgram(gl, vertex_shader_source, fragment_shader_source) {
+        const vertex_shader = gl.createShader(gl.VERTEX_SHADER);
+        gl.shaderSource(vertex_shader, vertex_shader_source);
+        gl.compileShader(vertex_shader);
+        const fragment_shader = gl.createShader(gl.FRAGMENT_SHADER);
+        gl.shaderSource(fragment_shader, fragment_shader_source);
+        gl.compileShader(fragment_shader);
+        const shader_program = gl.createProgram();
+        gl.attachShader(shader_program, vertex_shader);
+        gl.attachShader(shader_program, fragment_shader);
+        gl.linkProgram(shader_program);
+        return shader_program;
+    }
 
-    initForContext(gl, locations) {
-        function createShaderProgram(vertex_shader_source, fragment_shader_source) {
-            const vertex_shader = gl.createShader(gl.VERTEX_SHADER);
-            gl.shaderSource(vertex_shader, vertex_shader_source);
-            gl.compileShader(vertex_shader);
-            const fragment_shader = gl.createShader(gl.FRAGMENT_SHADER);
-            gl.shaderSource(fragment_shader, fragment_shader_source);
-            gl.compileShader(fragment_shader);
-            const shader_program = gl.createProgram();
-            gl.attachShader(shader_program, vertex_shader);
-            gl.attachShader(shader_program, fragment_shader);
-            gl.linkProgram(shader_program);
-            return shader_program;
-        }
-
-        const fill_shader_program = createShaderProgram(FillVertexShader, FillFragmentShader);
+    initForContext(canvas, gl, locations) {
+        const fill_shader_program = this.createShaderProgram(gl, FillVertexShader, FillFragmentShader);
         const fill_position_attribute = gl.getAttribLocation(fill_shader_program, 'aVertexPosition');
         const fill_translate_uniform = gl.getUniformLocation(fill_shader_program, 'uTranslate');
         const fill_scale_uniform = gl.getUniformLocation(fill_shader_program, 'uScale');
         const fill_color_uniform = gl.getUniformLocation(fill_shader_program, 'uFillColor');
 
-        const stroke_shader_program = createShaderProgram(StrokeVertexShader, StrokeFragmentShader);
+        const stroke_shader_program = this.createShaderProgram(gl, StrokeVertexShader, StrokeFragmentShader);
         const stroke_position_attribute = gl.getAttribLocation(stroke_shader_program, 'aVertexPosition');
         const stroke_normal_attribute = gl.getAttribLocation(stroke_shader_program, 'aVertexNormal');
         const stroke_translate_uniform = gl.getUniformLocation(stroke_shader_program, 'uTranslate');
@@ -126,6 +126,7 @@ export default class WebGLRenderer {
         }
 
         this.webgl_data = {
+            canvas: canvas,
             context: gl,
             fill_data: {
                 shader_program: fill_shader_program,
@@ -161,18 +162,22 @@ export default class WebGLRenderer {
             gl.getAttachedShaders(this.webgl_data.fill_data.shader_program).forEach(s => {
                 gl.deleteShader(s);
             });
-            gl.deleteProgram(this.webgl_data.fill_data.fill_shader_program);
+            gl.deleteProgram(this.webgl_data.fill_data.shader_program);
+            gl.getAttachedShaders(this.webgl_data.stroke_data.shader_program).forEach(s => {
+                gl.deleteShader(s);
+            });
+            gl.deleteProgram(this.webgl_data.stroke_data.shader_program);
         }
     }
 
-    renderMapInContext(locations, state) {
+    renderMapInContext(locations, state, background = [0.0, 0.0, 0.0, 0.0]) {
         const gl = this.webgl_data.context;
         const fill_data = this.webgl_data.fill_data;
         const stroke_data = this.webgl_data.stroke_data;
 
         const [translate, scale, stroke_scale] = this.generateTranslateAndScale(state);
 
-        gl.clearColor(0.0, 0.0, 0.0, 0.0);
+        gl.clearColor(...background);
         gl.clear(gl.COLOR_BUFFER_BIT);
 
         for (let i = 0; i < locations.length; i++) {

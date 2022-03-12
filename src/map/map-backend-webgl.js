@@ -3,6 +3,7 @@ import { LitElement, html, css } from 'lit-element';
 import earcut from 'earcut';
 
 import WebGLRenderer from './webgl-renderer';
+import WebGLRenderer3d from './webgl-renderer-3d';
 
 const location_data_cache = {};
 
@@ -35,7 +36,7 @@ class MapBackendWebGl extends LitElement {
     
     constructor() {
         super();
-        this.renderer = new WebGLRenderer();
+        this.renderer = new WebGLRenderer3d();
         this.state = {
             center: [0, 0],
             scale: 1,
@@ -163,12 +164,12 @@ class MapBackendWebGl extends LitElement {
         const handleResize = () => {
             canvas.width = canvas.clientWidth;
             canvas.height = canvas.clientHeight;
-            gl.viewport(0, 0, canvas.clientWidth, canvas.clientHeight);
-            this.state.size = [canvas.clientWidth, canvas.clientHeight];
+            gl.viewport(0, 0, canvas.width, canvas.height);
+            this.state.size = [canvas.width, canvas.height];
         }
         window.addEventListener('resize', handleResize);
         handleResize();
-        this.renderer.initForContext(gl, this.locations);
+        this.renderer.initForContext(canvas, gl, this.locations);
         this.renderMapInCanvas();
     }
 
