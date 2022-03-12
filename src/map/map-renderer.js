@@ -7,7 +7,6 @@ import '../ui/spinner';
 import { map as mapFromTo, hasWebGlSupport } from '../util';
 if(hasWebGlSupport()) {
     import(/* webpackChunkName: "map-backend-webgl" */ './map-backend-webgl');
-    import(/* webpackChunkName: "map-backend-webgl" */ './map-backend-3d');
 } else {
     import(/* webpackChunkName: "map-backend-svg" */ './map-backend-svg');
 }
@@ -360,7 +359,7 @@ class MapRenderer extends LitElement {
         if (event.deltaY < 0) {
             new_scale *= mapFromTo(event.deltaY, 0, -10, 1.1, 1.5);
         } else {
-            new_scale *= mapFromTo(event.deltaY, 0, 10, 0.8, 0.95);
+            new_scale *= mapFromTo(event.deltaY, 0, 10, 0.6, 0.9);
         }
         new_scale = Math.min(Math.max(MIN_ZOOM, new_scale), MAX_ZOOM);
         const ds = new_scale / map.scale;
@@ -553,11 +552,11 @@ class MapRenderer extends LitElement {
                                 </div>
                             </div>
                         </div>
-                        <map-backend-3d
+                        <map-backend
                             id="map-backend"
                             .locations="${locations}"
                             @hover="${this.handleLocationHover}"
-                        ></map-backend-3d>
+                        ></map-backend>
                     </div>
                     <div class="title">${data.title}</div>
                     <div id="map-legend">
