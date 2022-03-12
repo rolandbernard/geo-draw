@@ -183,9 +183,8 @@ export default class WebGLRenderer {
             gl.uniform2fv(stroke_data.translate_uniform, translate);
             gl.uniform2fv(stroke_data.scale_uniform, scale);
             gl.uniform2fv(stroke_data.scale2_uniform, stroke_scale);
-            gl.uniform1f(stroke_data.width_uniform, 0.05);
-            gl.uniform3fv(stroke_data.color_uniform, [1.0, 1.0, 1.0]);
-            // gl.uniform3fv(stroke_data.color_uniform, [0.271, 0.302, 0.38]);
+            gl.uniform1f(stroke_data.width_uniform, 0.005);
+            gl.uniform3fv(stroke_data.color_uniform, [0.271, 0.302, 0.38]);
             
             gl.bindBuffer(gl.ARRAY_BUFFER, triangles.gl_outline_normal_buffer);
             gl.vertexAttribPointer(stroke_data.normal_attribute, 2, gl.FLOAT, false, 0, 0);
@@ -201,12 +200,11 @@ export default class WebGLRenderer {
             gl.useProgram(fill_data.shader_program);
             gl.uniform2fv(fill_data.translate_uniform, translate);
             gl.uniform2fv(fill_data.scale_uniform, scale);
-            // if (loc.id === state.hover) {
-            //     gl.uniform3fv(fill_data.color_uniform, loc.color.map(el => el * 0.8));
-            // } else {
-            //     gl.uniform3fv(fill_data.color_uniform, loc.color);
-            // }
-            gl.uniform3fv(fill_data.color_uniform, [0, 0, 0]);
+            if (loc.id === state.hover) {
+                gl.uniform3fv(fill_data.color_uniform, loc.color.map(el => el * 0.8));
+            } else {
+                gl.uniform3fv(fill_data.color_uniform, loc.color);
+            }
             gl.bindBuffer(gl.ARRAY_BUFFER, triangles.gl_position_buffer);
             gl.vertexAttribPointer(fill_data.position_attribute, 2, gl.FLOAT, false, 0, 0);
             gl.enableVertexAttribArray(fill_data.position_attribute);

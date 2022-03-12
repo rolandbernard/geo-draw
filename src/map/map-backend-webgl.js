@@ -208,23 +208,31 @@ class MapBackendWebGl extends LitElement {
             vertex_count += poly.vertices.length;
             triangle_count += poly.triangles.length;
         }
-        const outline_triangles = new Float32Array(outline_count * 3 * 2 * 2);
-        const outline_normals = new Float32Array(outline_count * 3 * 2 * 2);
+        const outline_triangles = new Float32Array(outline_count * 24);
+        const outline_normals = new Float32Array(outline_count * 24);
         outline_count = 0;
         for (const poly of location.coords) {
             for (const part of poly) {
                 for (let i = 0; i < part.length; i++) {
                     const curr = part[i];
+                    const last = part[(part.length + i - 1) % part.length];
+                    const from_last = [curr[0] - last[0], curr[1] - last[1]];
                     const next = part[(i + 1) % part.length];
                     const to_next = [next[0] - curr[0], next[1] - curr[1]];
-                    const offset = outline_count * 12 + i * 12;
+                    const offset = outline_count * 24 + i * 24;
                     outline_triangles.set([
-                        curr[0], curr[1],   curr[0], curr[1],   next[0], next[1], 
+                        curr[0], curr[1],   curr[0], curr[1],   next[0], next[1], // Line
                         curr[0], curr[1],   next[0], next[1],   next[0], next[1],
+
+                        curr[0], curr[1],   curr[0], curr[1],   curr[0], curr[1], // Corner
+                        curr[0], curr[1],   curr[0], curr[1],   curr[0], curr[1],
                     ], offset);
                     outline_normals.set([
                         to_next[1], -to_next[0],   -to_next[1], to_next[0],   to_next[1], -to_next[0],
                         -to_next[1], to_next[0],   -to_next[1], to_next[0],   to_next[1], -to_next[0],
+
+                        -from_last[1], from_last[0], from_last[1], -from_last[0], -to_next[1], to_next[0],
+                        -from_last[1], from_last[0], from_last[1], -from_last[0], to_next[1], -to_next[0],
                     ], offset)
                 }
                 outline_count += part.length;
