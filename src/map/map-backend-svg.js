@@ -3,6 +3,7 @@ import { LitElement, html, svg, css } from 'lit-element';
 import { styleMap } from 'lit-html/directives/style-map';
 
 import { map } from '../util';
+import MapRenderer from './map-renderer';
 
 class MapBackendSvg extends LitElement {
 
@@ -127,8 +128,14 @@ class MapBackendSvg extends LitElement {
     }
     
     render() {
-        const min = this.locations.filter(loc => loc).map(loc => loc.min).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]);
-        const max = this.locations.filter(loc => loc).map(loc => loc.max).reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]);
+        const min = MapRenderer.project(
+            this.locations.filter(loc => loc).map(loc => loc.min)
+                .reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]));
+        const max = MapRenderer.project(
+            this.locations.filter(loc => loc).map(loc => loc.max)
+                .reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]));
+        [min[1], max[1]] = [max[1], min[1]]
+        console.log(min, max);
         const total_diff = Math.max(max[0] - min[0], max[1] - min[1]);
         const max_size = Math.max(window.innerWidth, window.innerHeight) * 5;
         this.locations.forEach(loc => {
@@ -136,6 +143,7 @@ class MapBackendSvg extends LitElement {
                 loc.svg = loc.coords.map(poly => (
                     svg`<path d="${poly.map((part, i) => (
                         (i == 0 ? part : part.reverse())
+                            .map(MapRenderer.project)
                             .map(coord => ([
                                 Math.round(map(coord[0], min[0], min[0] + total_diff, 0, max_size)),
                                 Math.round(map(coord[1], min[1], min[1] + total_diff, 0, max_size))

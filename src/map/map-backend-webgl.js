@@ -36,7 +36,7 @@ class MapBackendWebGl extends LitElement {
     
     constructor() {
         super();
-        this.renderer = new WebGLRenderer3d();
+        this.renderer = new WebGLRenderer();
         this.state = {
             center: [0, 0],
             scale: 1,
@@ -66,23 +66,23 @@ class MapBackendWebGl extends LitElement {
         return this.renderer.clientPosToMapPos(client_pos, map_pos, this.state);
     }
 
-    clientPosToLocationPos(client_pos) {
+    clientPosToProjPos(client_pos) {
         const map = this.shadowRoot.getElementById('map');
         const map_pos = map.getBoundingClientRect();
-        return this.renderer.clientPosToLocationPos(client_pos, map_pos, this.state);
+        return this.renderer.clientPosToProjPos(client_pos, map_pos, this.state);
     }
     
-    locationPosToClientPos(location_pos) {
+    projPosToClientPos(location_pos) {
         const map = this.shadowRoot.getElementById('map');
         const map_pos = map.getBoundingClientRect();
-        return this.renderer.locationPosToClientPos(location_pos, map_pos, this.state);
+        return this.renderer.projPosToClientPos(location_pos, map_pos, this.state);
     }
 
     handleMouseMove(event) {
-        const pos = this.clientPosToLocationPos([event.clientX, event.clientY]);
+        const pos = this.clientPosToProjPos([event.clientX, event.clientY]);
         for(const loc of this.locations) {
-            if(loc.min[0] <= pos[0] && loc.min[1] <= pos[1] &&
-                loc.max[0] >= pos[0] && loc.max[1] >= pos[1]) {
+            if(loc.triangles.min[0] <= pos[0] && loc.triangles.min[1] <= pos[1] &&
+                loc.triangles.max[0] >= pos[0] && loc.triangles.max[1] >= pos[1]) {
                 for(const polygon of loc.triangles.polygons) {
                     if(polygon.min[0] <= pos[0] && polygon.min[1] <= pos[1] &&
                         polygon.max[0] >= pos[0] && polygon.max[1] >= pos[1]) {
@@ -111,7 +111,7 @@ class MapBackendWebGl extends LitElement {
                                 this.state.hover = loc.id;
                                 const my_event = new Event('hover');
                                 my_event.location = loc;
-                                my_event.position = this.locationPosToClientPos([
+                                my_event.position = this.projPosToClientPos([
                                     (polygon.min[0] + polygon.max[0]) / 2,
                                     (polygon.min[1] + polygon.max[1]) / 2
                                 ]);
@@ -187,14 +187,17 @@ class MapBackendWebGl extends LitElement {
                 outline_count += part.length;
             }
             const data = earcut.flatten(poly);
+            this.renderer.applyProjection(data.vertices);
             const triangles = earcut(data.vertices, data.holes, data.dimensions);
             vertex_count += data.vertices.length;
             triangle_count += triangles.length;
             polygons.push({
                 vertices: new Float32Array(data.vertices),
                 triangles: new Uint16Array(triangles),
-                min: poly.flat().reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
-                max: poly.flat().reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
+                min: poly.flat().map(this.renderer.projection)
+                    .reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
+                max: poly.flat().map(this.renderer.projection)
+                    .reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
             });
         }
         const vertices = new Float32Array(vertex_count);
@@ -213,12 +216,13 @@ class MapBackendWebGl extends LitElement {
         const outline_normals = new Float32Array(outline_count * 24);
         outline_count = 0;
         for (const poly of location.coords) {
-            for (const part of poly) {
+            for (const raw_part of poly) {
+                const part = raw_part.map(this.renderer.projection)
                 for (let i = 0; i < part.length; i++) {
                     const curr = part[i];
                     const last = part[(part.length + i - 1) % part.length];
-                    const from_last = [curr[0] - last[0], curr[1] - last[1]];
                     const next = part[(i + 1) % part.length];
+                    const from_last = [curr[0] - last[0], curr[1] - last[1]];
                     const to_next = [next[0] - curr[0], next[1] - curr[1]];
                     const offset = outline_count * 24 + i * 24;
                     outline_triangles.set([
@@ -239,14 +243,14 @@ class MapBackendWebGl extends LitElement {
                 outline_count += part.length;
             }
         }
-        return { polygons, vertices, triangles, outline_triangles, outline_normals };
+        return {
+            polygons, vertices, triangles, outline_triangles, outline_normals,
+            min: polygons.map(p => p.min).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
+            max: polygons.map(p => p.max).reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
+        };
     }
 
     buildRenderData() {
-        const min = this.locations.filter(loc => loc).map(loc => loc.min).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]);
-        const max = this.locations.filter(loc => loc).map(loc => loc.max).reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]);
-        this.state.min = min;
-        this.state.max = max;
         this.locations.forEach(loc => {
             loc.color = loc.color.map(el => el / 255);
             if (loc) {
@@ -256,6 +260,11 @@ class MapBackendWebGl extends LitElement {
                 loc.triangles = location_data_cache[loc.id];
             }
         });
+        this.state.min = this.locations.map(l => l.triangles.min)
+            .reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]);
+        this.state.max = this.locations.map(l => l.triangles.max)
+            .reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]);
+        console.log(this.state.min, this.state.max)
     }
 
     render() {

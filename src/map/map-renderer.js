@@ -17,7 +17,7 @@ const location_cache = {};
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 30;
 
-class MapRenderer extends LitElement {
+export default class MapRenderer extends LitElement {
 
     static get properties() {
         return {
@@ -267,14 +267,21 @@ class MapRenderer extends LitElement {
 
     static project([lon, lat]) {
         return [
-            (Math.PI + (lon * Math.PI / 180)),
+            Math.PI + lon,
             ((() => {
                 if (Math.abs(lat) > 85) {
                     lat = Math.sign(lat) * 85;
                 } 
-                const phi = lat * Math.PI / 180;
+                const phi = lat;
                 return Math.PI - Math.log(Math.tan(Math.PI / 4 + phi / 2));
             })())
+        ];
+    }
+
+    static to_radians([lon, lat]) {
+        return [
+            lon * Math.PI / 180,
+            lat * Math.PI / 180,
         ];
     }
 
@@ -464,14 +471,14 @@ class MapRenderer extends LitElement {
                         if (res.ok) {
                             const data = MapRenderer.parseBinaryData(await res.arrayBuffer());
                             const coords = data.coords.map(poly => poly.map(part => (
-                                part.map(([lon, lat]) => MapRenderer.project([lon / 1e7, lat / 1e7]))
+                                part.map(([lon, lat]) => MapRenderer.to_radians([lon / 1e7, lat / 1e7]))
                             )));
                             location_cache[location] = {
                                 id: location,
                                 name: data.name,
+                                coords: coords,
                                 min: coords.flat(2).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
                                 max: coords.flat(2).reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
-                                coords: coords,
                                 raw_coords: data.coords,
                             };
                         } else {

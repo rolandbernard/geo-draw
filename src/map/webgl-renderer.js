@@ -4,7 +4,19 @@ import FillVertexShader from './shaders/fill-vertex-shader.glsl';
 import StrokeFragmentShader from './shaders/stroke-fragment-shader.glsl';
 import StrokeVertexShader from './shaders/stroke-vertex-shader.glsl';
 
+import MapRenderer from './map-renderer';
+
 export default class WebGLRenderer {
+    projection(array) {
+        return MapRenderer.project(array);
+    }
+
+    applyProjection(array) {
+        for (let i = 0; i < array.length; i += 2) {
+            [array[i], array[i + 1]] = this.projection([array[i], array[i + 1]]);
+        }
+    }
+
     clientPosToMapPos(client_pos, map_pos, state) {
         const [_, scale] = this.generateTranslateAndScale(state);
         const client_pos_norm = [
@@ -17,7 +29,7 @@ export default class WebGLRenderer {
         ];
     }
 
-    clientPosToLocationPos(client_pos, map_pos, state) {
+    clientPosToProjPos(client_pos, map_pos, state) {
         const [transform, scale] = this.generateTranslateAndScale(state);
         const client_pos_norm = [
             2 * (client_pos[0] - map_pos.x) / map_pos.width - 1.0,
@@ -29,7 +41,7 @@ export default class WebGLRenderer {
         ];
     }
 
-    locationPosToClientPos(location_pos, map_pos, state) {
+    projPosToClientPos(location_pos, map_pos, state) {
         const [transform, scale] = this.generateTranslateAndScale(state);
         const client_pos_norm = [
             (location_pos[0] + transform[0]) * scale[0],
@@ -170,14 +182,14 @@ export default class WebGLRenderer {
         }
     }
 
-    renderMapInContext(locations, state, background = [0.0, 0.0, 0.0, 0.0]) {
+    renderMapInContext(locations, state) {
         const gl = this.webgl_data.context;
         const fill_data = this.webgl_data.fill_data;
         const stroke_data = this.webgl_data.stroke_data;
 
         const [translate, scale, stroke_scale] = this.generateTranslateAndScale(state);
 
-        gl.clearColor(...background);
+        gl.clearColor(0.0, 0.0, 0.0, 0.0);
         gl.clear(gl.COLOR_BUFFER_BIT);
 
         for (let i = 0; i < locations.length; i++) {
