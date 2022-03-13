@@ -7,7 +7,7 @@ import GlowVertexShader from './shaders/glow-vertex-shader.glsl';
 import WebGLRenderer from './webgl-renderer';
 
 const TEXTURE_HEIGHT = 2048;
-const TEXTURE_WIDTH = 2048;
+const TEXTURE_WIDTH = 4096;
 
 const SPHERE_SEGMENTS = 25;
 
@@ -68,11 +68,13 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         ];
     }
 
-    generateTexMinMax({center, scale}) {
+    generateTexMinMax(state) {
+        const {center} = state;
+        const screen_scale = this.generateScale(state);
         let beta = -center[0];
         let gamma = -center[1];
         let res;
-        if (scale < 2) {
+        if (1/(screen_scale[0]*screen_scale[0]) + 1/(screen_scale[1]*screen_scale[1]) > 1) {
             if (Math.abs(gamma) < 0.1) {
                 res = [
                     [0.5 - beta / Math.PI / 2 - 0.26, 0],
@@ -83,11 +85,18 @@ export default class WebGLRenderer3d extends WebGLRenderer {
             } else {
                 res = [[0, gamma / Math.PI], [1, 1]];
             }
+        } else if (0.5 - Math.abs(gamma) / Math.PI < Math.max(0.05, 0.5 / screen_scale[1])) {
+            if (gamma < 0) {
+                res = [[0, 0], [1, 1 + gamma / Math.PI]];
+            } else {
+                res = [[0, gamma / Math.PI], [1, 1]];
+            }
         } else {
-            const size = Math.min(0.25, 0.5 / scale);
+            const size_x = Math.min(0.25, 0.25 * (1 + (Math.abs(gamma) / Math.PI > 0.4 ? 3 : 1) * Math.abs(gamma)) / screen_scale[0]);
+            const size_y = Math.min(0.25, 0.25 * (1 + Math.abs(gamma)) / screen_scale[1]);
             res = [
-                [0.5 - beta / Math.PI / 2 - size, 0.5 + gamma / Math.PI - 2 * size],
-                [0.5 - beta / Math.PI / 2 + size, 0.5 + gamma / Math.PI + 2 * size]
+                [0.5 - beta / Math.PI / 2 - size_x, 0.5 + gamma / Math.PI - 2 * size_y],
+                [0.5 - beta / Math.PI / 2 + size_x, 0.5 + gamma / Math.PI + 2 * size_y]
             ];
         }
         res[0][0] = (1 + (res[0][0] % 1)) % 1;
