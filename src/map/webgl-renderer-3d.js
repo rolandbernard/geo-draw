@@ -1,10 +1,12 @@
 
 import TexturedFragmentShader from './shaders/textured-fragment-shader.glsl';
 import TexturedVertexShader from './shaders/textured-vertex-shader.glsl';
+import GlowFragmentShader from './shaders/glow-fragment-shader.glsl';
+import GlowVertexShader from './shaders/glow-vertex-shader.glsl';
 
 import WebGLRenderer from './webgl-renderer';
 
-const TEXTURE_HEIGHT = 1024;
+const TEXTURE_HEIGHT = 2048;
 const TEXTURE_WIDTH = 2048;
 
 const SPHERE_SEGMENTS = 25;
@@ -30,61 +32,77 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         return super.locationPosToClientPos(location_pos, map_pos, state);
     }
     
-    generateScaleTransform({size, scale: zoom_scale}) {
+    generateScale({size, scale: zoom_scale}) {
         let scale;
         if(size[0] < size[1]) {
             scale = [zoom_scale, (size[0] / size[1]) * zoom_scale];
         } else {
             scale = [(size[1] / size[0]) * zoom_scale, zoom_scale];
         }
-        return [
-            scale[0], 0, 0, 0,
-            0, scale[1], 0, 0,
-            0, 0, 1, 0,
-            0, 0, 0, 1,
-        ];
+        return scale;
     }
 
     generateTransform(state) {
         const {center} = state;
-        const scale_transform = this.generateScaleTransform(state);
+        const scale = this.generateScale(state);
         const alpha = 0;
         const beta = -center[0];
         const gamma = -center[1];
         return [
-            Math.cos(alpha) * Math.cos(beta) * scale_transform[0],
-            (Math.cos(alpha) * Math.sin(beta) * Math.sin(gamma) - Math.sin(alpha) * Math.cos(gamma)) * scale_transform[5],
-            (Math.cos(alpha) * Math.sin(beta) * Math.cos(gamma) + Math.sin(alpha) * Math.sin(gamma)) * scale_transform[10],
+            Math.cos(alpha) * Math.cos(beta) * scale[0],
+            (Math.cos(alpha) * Math.sin(beta) * Math.sin(gamma) - Math.sin(alpha) * Math.cos(gamma)) * scale[1],
+            (Math.cos(alpha) * Math.sin(beta) * Math.cos(gamma) + Math.sin(alpha) * Math.sin(gamma)),
             0,
 
-            Math.sin(alpha) * Math.cos(beta) * scale_transform[0],
-            (Math.sin(alpha) * Math.sin(beta) * Math.sin(gamma) + Math.cos(alpha) * Math.cos(gamma)) * scale_transform[5],
-            (Math.sin(alpha) * Math.sin(beta) * Math.cos(gamma) - Math.cos(alpha) * Math.sin(gamma)) * scale_transform[10],
+            Math.sin(alpha) * Math.cos(beta) * scale[0],
+            (Math.sin(alpha) * Math.sin(beta) * Math.sin(gamma) + Math.cos(alpha) * Math.cos(gamma)) * scale[1],
+            (Math.sin(alpha) * Math.sin(beta) * Math.cos(gamma) - Math.cos(alpha) * Math.sin(gamma)),
             0,
 
-            -Math.sin(beta) * scale_transform[0],
-            Math.cos(beta) * Math.sin(gamma) * scale_transform[5],
-            Math.cos(beta) * Math.cos(gamma) * scale_transform[10],
+            -Math.sin(beta) * scale[0],
+            Math.cos(beta) * Math.sin(gamma) * scale[1],
+            Math.cos(beta) * Math.cos(gamma),
             0,
 
             0, 0, 0, 1,
         ];
     }
 
-    generateTexMinMax({center}) {
+    generateTexMinMax({center, scale}) {
         const beta = -center[0];
-        const res = [[-beta / Math.PI / 2 + 0.25, 0], [-beta / Math.PI / 2 - 0.25, 1]];
+        const gamma = -center[1];
+        let res;
+        if (scale < 2) {
+            if (Math.abs(gamma) < 0.1) {
+                res = [
+                    [0.5 - beta / Math.PI / 2 - 0.26, 0],
+                    [0.5 - beta / Math.PI / 2 + 0.26, 1]
+                ];
+            } else {
+                res = [[0, 0], [1, 1]];
+            }
+        } else {
+            const size = Math.min(0.25, 0.25 / scale);
+            res = [
+                [0.5 - beta / Math.PI / 2 - size, 0.5 + gamma / Math.PI - 2 * size],
+                [0.5 - beta / Math.PI / 2 + size, 0.5 + gamma / Math.PI + 2 * size]
+            ];
+        }
         res[0][0] = (1 + (res[0][0] % 1)) % 1;
         res[1][0] = (1 + (res[1][0] % 1)) % 1;
-        if (res[1][0] < res[0][0]) {
+        if (res[1][0] <= res[0][0]) {
             res[1][0] += 1;
         }
+        res[0][1] = Math.min(1, Math.max(0, res[0][1]));
+        res[1][1] = Math.min(1, Math.max(0, res[1][1]));
         return res;
     }
 
     initForContext(canvas, gl, locations) {
         super.initForContext(canvas, gl, locations);
         gl.enable(gl.DEPTH_TEST);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
         const texture_shader_program = this.createShaderProgram(gl, TexturedVertexShader, TexturedFragmentShader);
         const texture_position_attribute = gl.getAttribLocation(texture_shader_program, 'aVertexPosition');
@@ -137,6 +155,37 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         gl.bindBuffer(gl.ARRAY_BUFFER, sphere_texcoord_buffer);
         gl.bufferData(gl.ARRAY_BUFFER, sphere_texcoord, gl.STATIC_DRAW);
 
+        const glow_shader_program = this.createShaderProgram(gl, GlowVertexShader, GlowFragmentShader);
+        const glow_position_attribute = gl.getAttribLocation(glow_shader_program, 'aVertexPosition');
+        const glow_scale_uniform = gl.getUniformLocation(glow_shader_program, 'uScale');
+
+        const glow_vertices = new Float32Array(8);
+        {
+            glow_vertices[0] = -2;
+            glow_vertices[1] = 2;
+            glow_vertices[2] = 2;
+            glow_vertices[3] = 2;
+            glow_vertices[4] = 2;
+            glow_vertices[5] = -2;
+            glow_vertices[6] = -2;
+            glow_vertices[7] = -2;
+        }
+        const glow_triangles = new Uint16Array(6);
+        {
+            glow_triangles[0] = 0;
+            glow_triangles[1] = 1;
+            glow_triangles[2] = 2;
+            glow_triangles[3] = 2;
+            glow_triangles[4] = 3;
+            glow_triangles[5] = 0;
+        }
+        const glow_position_buffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, glow_position_buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, glow_vertices, gl.STATIC_DRAW);
+        const glow_index_buffer = gl.createBuffer();
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, glow_index_buffer);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, glow_triangles, gl.STATIC_DRAW);
+
         this.webgl_data.texture = texture;
         this.webgl_data.texture_data = {
             shader_program: texture_shader_program,
@@ -154,6 +203,15 @@ export default class WebGLRenderer3d extends WebGLRenderer {
             gl_position_buffer: sphere_position_buffer,
             gl_index_buffer: sphere_index_buffer,
             gl_texcoord_buffer: sphere_texcoord_buffer,
+        };
+        this.webgl_data.glow_data = {
+            shader_program: glow_shader_program,
+            position_attribute: glow_position_attribute,
+            scale_uniform: glow_scale_uniform,
+            vertices: glow_vertices,
+            triangles: glow_triangles,
+            gl_position_buffer: glow_position_buffer,
+            gl_index_buffer: glow_index_buffer,
         };
     }
 
@@ -187,10 +245,10 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         const scale = [1 / (max[0] - min[0]) / Math.PI, 2 / (max[1] - min[1]) / Math.PI];
         const stroke_scale = [
             0.5 / (max[0] - min[0]) / state.scale,
-            0.5 / (max[0] - min[0]) / state.scale
+            0.5 / (max[1] - min[1]) / state.scale
         ];
 
-        gl.clearColor(0.0, 0.35, 0.55, 1.0);
+        gl.clearColor(0.0, 0.25, 0.55, 1.0);
         gl.clear(gl.COLOR_BUFFER_BIT);
 
         for (let x = 0; x <= 1; x++) {
@@ -249,13 +307,14 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         const gl = this.webgl_data.context;
         const tex_data = this.webgl_data.texture_data;
         const sphere_data = this.webgl_data.sphere_data;
+        const glow_data = this.webgl_data.glow_data;
         const [min, max] = this.generateTexMinMax(state);
 
         this.renderToTexture(locations, state, min, max);
 
         gl.clearColor(0.0, 0.0, 0.0, 0.0);
         gl.clearDepth(1);
-        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         
         // Draw sphere
         gl.useProgram(tex_data.shader_program);
@@ -274,6 +333,18 @@ export default class WebGLRenderer3d extends WebGLRenderer {
 
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, sphere_data.gl_index_buffer);
         gl.drawElements(gl.TRIANGLES, sphere_data.triangles.length, gl.UNSIGNED_SHORT, 0);
+
+        // Draw glow
+        gl.clear(gl.DEPTH_BUFFER_BIT);
+        gl.useProgram(glow_data.shader_program);
+        gl.uniform2fv(glow_data.scale_uniform, this.generateScale(state));
+        
+        gl.bindBuffer(gl.ARRAY_BUFFER, glow_data.gl_position_buffer);
+        gl.vertexAttribPointer(glow_data.position_attribute, 2, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(glow_data.position_attribute);
+
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, glow_data.gl_index_buffer);
+        gl.drawElements(gl.TRIANGLES, glow_data.triangles.length, gl.UNSIGNED_SHORT, 0);
     }
 }
 
