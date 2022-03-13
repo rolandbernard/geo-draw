@@ -69,8 +69,8 @@ export default class WebGLRenderer3d extends WebGLRenderer {
     }
 
     generateTexMinMax({center, scale}) {
-        const beta = -center[0];
-        const gamma = -center[1];
+        let beta = -center[0];
+        let gamma = -center[1];
         let res;
         if (scale < 2) {
             if (Math.abs(gamma) < 0.1) {
@@ -78,11 +78,13 @@ export default class WebGLRenderer3d extends WebGLRenderer {
                     [0.5 - beta / Math.PI / 2 - 0.26, 0],
                     [0.5 - beta / Math.PI / 2 + 0.26, 1]
                 ];
+            } else if (gamma < 0) {
+                res = [[0, 0], [1, 1 + gamma / Math.PI]];
             } else {
-                res = [[0, 0], [1, 1]];
+                res = [[0, gamma / Math.PI], [1, 1]];
             }
         } else {
-            const size = Math.min(0.25, 0.25 / scale);
+            const size = Math.min(0.25, 0.5 / scale);
             res = [
                 [0.5 - beta / Math.PI / 2 - size, 0.5 + gamma / Math.PI - 2 * size],
                 [0.5 - beta / Math.PI / 2 + size, 0.5 + gamma / Math.PI + 2 * size]
@@ -116,6 +118,8 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         gl.bindTexture(gl.TEXTURE_2D, texture);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, TEXTURE_WIDTH, TEXTURE_HEIGHT, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
         const sphere_vertices = new Float32Array(SPHERE_SEGMENTS * SPHERE_SEGMENTS * 3);
         const sphere_texcoord = new Float32Array(SPHERE_SEGMENTS * SPHERE_SEGMENTS * 2);
