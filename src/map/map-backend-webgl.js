@@ -36,7 +36,7 @@ class MapBackendWebGl extends LitElement {
     
     constructor() {
         super();
-        this.renderer = new WebGLRenderer();
+        this.renderer = new WebGLRenderer3d();
         this.state = {
             center: [0, 0],
             scale: 1,
@@ -264,7 +264,6 @@ class MapBackendWebGl extends LitElement {
             .reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]);
         this.state.max = this.locations.map(l => l.triangles.max)
             .reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]);
-        console.log(this.state.min, this.state.max)
     }
 
     render() {

@@ -135,7 +135,6 @@ class MapBackendSvg extends LitElement {
             this.locations.filter(loc => loc).map(loc => loc.max)
                 .reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]));
         [min[1], max[1]] = [max[1], min[1]]
-        console.log(min, max);
         const total_diff = Math.max(max[0] - min[0], max[1] - min[1]);
         const max_size = Math.max(window.innerWidth, window.innerHeight) * 5;
         this.locations.forEach(loc => {

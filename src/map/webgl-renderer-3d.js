@@ -10,6 +10,14 @@ const TEXTURE_WIDTH = 2048;
 const SPHERE_SEGMENTS = 50;
 
 export default class WebGLRenderer3d extends WebGLRenderer {
+    projection(array) {
+        return [...array];
+    }
+
+    applyProjection(_array) {
+        // This is a noop
+    }
+
     clientPosToMapPos(client_pos, map_pos, state) {
         return super.clientPosToMapPos(client_pos, map_pos, state);
     }
@@ -80,63 +88,63 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-        // const sphere_vertices = new Float32Array(SPHERE_SEGMENTS * SPHERE_SEGMENTS * 3);
-        // const sphere_texcoord = new Float32Array(SPHERE_SEGMENTS * SPHERE_SEGMENTS * 2);
-        // let vertex_count = 0;
-        // for (let j = 0; j < SPHERE_SEGMENTS; j++) {
-        //     for (let i = 0; i < SPHERE_SEGMENTS; i++) {
-        //         const alpha = Math.PI * j / (SPHERE_SEGMENTS - 1) - Math.PI / 2;
-        //         const beta = 2 * Math.PI * i / SPHERE_SEGMENTS;
-        //         sphere_vertices[vertex_count * 3 + 0] = Math.cos(alpha) * Math.sin(beta);
-        //         sphere_vertices[vertex_count * 3 + 1] = Math.sin(alpha);
-        //         sphere_vertices[vertex_count * 3 + 2] = Math.cos(alpha) * Math.cos(beta);
-        //         sphere_texcoord[vertex_count * 2 + 0] = 1 - i / SPHERE_SEGMENTS;
-        //         sphere_texcoord[vertex_count * 2 + 1] = 1 - j / (SPHERE_SEGMENTS - 1);
-        //         vertex_count++;
-        //     }
-        // }
-        // const sphere_triangles = new Uint16Array((SPHERE_SEGMENTS - 1) * SPHERE_SEGMENTS * 6);
-        // let triangle_count = 0;
-        // for (let j = 0; j < SPHERE_SEGMENTS - 1; j++) {
-        //     for (let i = 0; i < SPHERE_SEGMENTS; i++) {
-        //         sphere_triangles[triangle_count * 3 + 0] = (j + 1) * SPHERE_SEGMENTS + i;
-        //         sphere_triangles[triangle_count * 3 + 1] = j * SPHERE_SEGMENTS + (i + 1) % SPHERE_SEGMENTS;
-        //         sphere_triangles[triangle_count * 3 + 2] = j * SPHERE_SEGMENTS + i;
-        //         sphere_triangles[triangle_count * 3 + 3] = (j + 1) * SPHERE_SEGMENTS + i;
-        //         sphere_triangles[triangle_count * 3 + 4] = (j + 1) * SPHERE_SEGMENTS + (i + 1) % SPHERE_SEGMENTS;
-        //         sphere_triangles[triangle_count * 3 + 5] = j * SPHERE_SEGMENTS + (i + 1) % SPHERE_SEGMENTS;
-        //         triangle_count += 2;
-        //     }
-        // }
-        const sphere_vertices = new Float32Array(4 * 3);
-        const sphere_texcoord = new Float32Array(4 * 2);
-        sphere_vertices[0] = 1;
-        sphere_vertices[1] = -1;
-        sphere_vertices[2] = 0;
-        sphere_vertices[3] = 1;
-        sphere_vertices[4] = 1;
-        sphere_vertices[5] = 0;
-        sphere_vertices[6] = -1;
-        sphere_vertices[7] = 1;
-        sphere_vertices[8] = 0;
-        sphere_vertices[9] = -1;
-        sphere_vertices[10] = -1;
-        sphere_vertices[11] = 0;
-        sphere_texcoord[0] = 1;
-        sphere_texcoord[1] = 0;
-        sphere_texcoord[2] = 1;
-        sphere_texcoord[3] = 1;
-        sphere_texcoord[4] = 0;
-        sphere_texcoord[5] = 1;
-        sphere_texcoord[6] = 0;
-        sphere_texcoord[7] = 0;
-        const sphere_triangles = new Uint16Array(6);
-        sphere_triangles[0] = 0;
-        sphere_triangles[1] = 1;
-        sphere_triangles[2] = 2;
-        sphere_triangles[3] = 2;
-        sphere_triangles[4] = 3;
-        sphere_triangles[5] = 0;
+        const sphere_vertices = new Float32Array(SPHERE_SEGMENTS * SPHERE_SEGMENTS * 3);
+        const sphere_texcoord = new Float32Array(SPHERE_SEGMENTS * SPHERE_SEGMENTS * 2);
+        let vertex_count = 0;
+        for (let j = 0; j < SPHERE_SEGMENTS; j++) {
+            for (let i = 0; i < SPHERE_SEGMENTS; i++) {
+                const alpha = Math.PI * j / (SPHERE_SEGMENTS - 1) - Math.PI / 2;
+                const beta = 2 * Math.PI * i / SPHERE_SEGMENTS;
+                sphere_vertices[vertex_count * 3 + 0] = Math.cos(alpha) * Math.sin(beta);
+                sphere_vertices[vertex_count * 3 + 1] = Math.sin(alpha);
+                sphere_vertices[vertex_count * 3 + 2] = Math.cos(alpha) * Math.cos(beta);
+                sphere_texcoord[vertex_count * 2 + 0] = 1 - i / SPHERE_SEGMENTS;
+                sphere_texcoord[vertex_count * 2 + 1] = 1 - j / (SPHERE_SEGMENTS - 1);
+                vertex_count++;
+            }
+        }
+        const sphere_triangles = new Uint16Array((SPHERE_SEGMENTS - 1) * SPHERE_SEGMENTS * 6);
+        let triangle_count = 0;
+        for (let j = 0; j < SPHERE_SEGMENTS - 1; j++) {
+            for (let i = 0; i < SPHERE_SEGMENTS; i++) {
+                sphere_triangles[triangle_count * 3 + 0] = (j + 1) * SPHERE_SEGMENTS + i;
+                sphere_triangles[triangle_count * 3 + 1] = j * SPHERE_SEGMENTS + (i + 1) % SPHERE_SEGMENTS;
+                sphere_triangles[triangle_count * 3 + 2] = j * SPHERE_SEGMENTS + i;
+                sphere_triangles[triangle_count * 3 + 3] = (j + 1) * SPHERE_SEGMENTS + i;
+                sphere_triangles[triangle_count * 3 + 4] = (j + 1) * SPHERE_SEGMENTS + (i + 1) % SPHERE_SEGMENTS;
+                sphere_triangles[triangle_count * 3 + 5] = j * SPHERE_SEGMENTS + (i + 1) % SPHERE_SEGMENTS;
+                triangle_count += 2;
+            }
+        }
+        // const sphere_vertices = new Float32Array(4 * 3);
+        // const sphere_texcoord = new Float32Array(4 * 2);
+        // sphere_vertices[0] = 1;
+        // sphere_vertices[1] = -1;
+        // sphere_vertices[2] = 0;
+        // sphere_vertices[3] = 1;
+        // sphere_vertices[4] = 1;
+        // sphere_vertices[5] = 0;
+        // sphere_vertices[6] = -1;
+        // sphere_vertices[7] = 1;
+        // sphere_vertices[8] = 0;
+        // sphere_vertices[9] = -1;
+        // sphere_vertices[10] = -1;
+        // sphere_vertices[11] = 0;
+        // sphere_texcoord[0] = 1;
+        // sphere_texcoord[1] = 0;
+        // sphere_texcoord[2] = 1;
+        // sphere_texcoord[3] = 1;
+        // sphere_texcoord[4] = 0;
+        // sphere_texcoord[5] = 1;
+        // sphere_texcoord[6] = 0;
+        // sphere_texcoord[7] = 0;
+        // const sphere_triangles = new Uint16Array(6);
+        // sphere_triangles[0] = 0;
+        // sphere_triangles[1] = 1;
+        // sphere_triangles[2] = 2;
+        // sphere_triangles[3] = 2;
+        // sphere_triangles[4] = 3;
+        // sphere_triangles[5] = 0;
         const sphere_position_buffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, sphere_position_buffer);
         gl.bufferData(gl.ARRAY_BUFFER, sphere_vertices, gl.STATIC_DRAW);
