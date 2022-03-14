@@ -68,35 +68,49 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         ];
     }
 
+    normalizePosition([beta, gamma]) {
+        gamma = (gamma + Math.PI) % (2 * Math.PI);
+        gamma = (2 * Math.PI + gamma) % (2 * Math.PI) - Math.PI;
+        if (gamma < -Math.PI / 2) {
+            beta += Math.PI;
+            gamma = Math.abs(-Math.PI / 2 - gamma) - Math.PI / 2;
+        } else if (gamma > Math.PI / 2) {
+            beta += Math.PI;
+            gamma = Math.PI / 2 - Math.abs(gamma - Math.PI / 2);
+        }
+        beta = (beta + Math.PI) % (2 * Math.PI);
+        beta = (2 * Math.PI + beta) % (2 * Math.PI);
+        return [beta - Math.PI, gamma];
+    }
+
     generateTexMinMax(state) {
-        const {center} = state;
+        const { center } = state;
         const screen_scale = this.generateScale(state);
-        let beta = -center[0];
-        let gamma = -center[1];
+        const [beta, gamma] = this.normalizePosition(center);
         let res;
-        if (1/(screen_scale[0]*screen_scale[0]) + 1/(screen_scale[1]*screen_scale[1]) > 1) {
+        if (1 / (screen_scale[0] * screen_scale[0]) + 1 / (screen_scale[1] * screen_scale[1]) > 1) {
             if (Math.abs(gamma) < 0.1) {
                 res = [
-                    [0.5 - beta / Math.PI / 2 - 0.26, 0],
-                    [0.5 - beta / Math.PI / 2 + 0.26, 1]
+                    [0.5 + beta / Math.PI / 2 - 0.26, 0],
+                    [0.5 + beta / Math.PI / 2 + 0.26, 1]
                 ];
-            } else if (gamma < 0) {
-                res = [[0, 0], [1, 1 + gamma / Math.PI]];
+            } else if (gamma > 0) {
+                res = [[0, 0], [1, 1 - gamma / Math.PI]];
             } else {
-                res = [[0, gamma / Math.PI], [1, 1]];
+                res = [[0, -gamma / Math.PI], [1, 1]];
             }
         } else if (0.5 - Math.abs(gamma) / Math.PI < Math.max(0.05, 0.5 / screen_scale[1])) {
-            if (gamma < 0) {
-                res = [[0, 0], [1, 1 + gamma / Math.PI]];
+            if (gamma > 0) {
+                res = [[0, 0], [1, 1 - gamma / Math.PI]];
             } else {
-                res = [[0, gamma / Math.PI], [1, 1]];
+                res = [[0, -gamma / Math.PI], [1, 1]];
             }
         } else {
             const size_x = Math.min(0.25, 0.25 * (1 + (Math.abs(gamma) / Math.PI > 0.4 ? 3 : 1) * Math.abs(gamma)) / screen_scale[0]);
             const size_y = Math.min(0.25, 0.25 * (1 + Math.abs(gamma)) / screen_scale[1]);
             res = [
-                [0.5 - beta / Math.PI / 2 - size_x, 0.5 + gamma / Math.PI - 2 * size_y],
-                [0.5 - beta / Math.PI / 2 + size_x, 0.5 + gamma / Math.PI + 2 * size_y]
+                [0.5 + beta / Math.PI / 2 - size_x, 0.5 - gamma / Math.PI - 2 * size_y],
+                [0.5 + beta / Math.PI / 2 + size_x, 0.5 - gamma / Math.PI + 2 * size_y]
             ];
         }
         res[0][0] = (1 + (res[0][0] % 1)) % 1;
