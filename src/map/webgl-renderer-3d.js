@@ -45,8 +45,20 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         return this.normalizePosition(this.clientPosToMapPos(client_pos, map_pos, state));
     }
 
-    projPosToClientPos(location_pos, map_pos, state) {
-        return [0, 0];
+    projPosToClientPos(proj_pos, map_pos, state) {
+        const { center } = state;
+        const coord = this.normalizePosition([
+            proj_pos[0] - center[0], proj_pos[1] - center[1],
+        ]);
+        const pos = [
+            Math.cos(coord[1]) * Math.sin(coord[0]),
+            Math.sin(coord[1]),
+        ];
+        const scale = this.generateScale(state);
+        return [
+            (pos[0] * scale[0] + 1) / 2 * map_pos.width + map_pos.x,
+            (1 - pos[1] * scale[1]) / 2 * map_pos.height + map_pos.y
+        ];
     }
     
     generateScale({size, scale: zoom_scale}) {
