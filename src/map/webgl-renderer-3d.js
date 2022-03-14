@@ -21,15 +21,32 @@ export default class WebGLRenderer3d extends WebGLRenderer {
     }
 
     clientPosToMapPos(client_pos, map_pos, state) {
-        return super.clientPosToMapPos(client_pos, map_pos, state);
+        const { center } = state;
+        const scale = this.generateScale(state);
+        const pos = [
+            (2 * (client_pos[0] - map_pos.x) / map_pos.width - 1.0) / scale[0],
+            (1.0 - 2 * (client_pos[1] - map_pos.y) / map_pos.height) / scale[1],
+            0
+        ];
+        pos[2] = 1 - pos[0]*pos[0] - pos[1]*pos[1];
+        if (pos[2] < 0) {
+            pos[2] = 0;
+        } else {
+            pos[2] = Math.sqrt(pos[2]);
+        }
+        const coord = [
+            center[0] + Math.atan2(pos[0], pos[2]),
+            center[1] + Math.atan2(pos[1], Math.sqrt(pos[0]*pos[0] + pos[2]*pos[2])),
+        ];
+        return coord;
     }
 
-    clientPosToLocationPos(client_pos, map_pos, state) {
-        return super.clientPosToLocationPos(client_pos, map_pos, state);
+    clientPosToProjPos(client_pos, map_pos, state) {
+        return this.normalizePosition(this.clientPosToMapPos(client_pos, map_pos, state));
     }
 
-    locationPosToClientPos(location_pos, map_pos, state) {
-        return super.locationPosToClientPos(location_pos, map_pos, state);
+    projPosToClientPos(location_pos, map_pos, state) {
+        return [0, 0];
     }
     
     generateScale({size, scale: zoom_scale}) {
@@ -47,7 +64,7 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         const scale = this.generateScale(state);
         const alpha = 0;
         const beta = -center[0];
-        const gamma = -center[1];
+        const gamma = center[1];
         return [
             Math.cos(alpha) * Math.cos(beta) * scale[0],
             (Math.cos(alpha) * Math.sin(beta) * Math.sin(gamma) - Math.sin(alpha) * Math.cos(gamma)) * scale[1],
@@ -94,23 +111,23 @@ export default class WebGLRenderer3d extends WebGLRenderer {
                     [0.5 + beta / Math.PI / 2 - 0.26, 0],
                     [0.5 + beta / Math.PI / 2 + 0.26, 1]
                 ];
-            } else if (gamma > 0) {
-                res = [[0, 0], [1, 1 - gamma / Math.PI]];
+            } else if (gamma < 0) {
+                res = [[0, 0], [1, 1 + gamma / Math.PI]];
             } else {
-                res = [[0, -gamma / Math.PI], [1, 1]];
+                res = [[0, gamma / Math.PI], [1, 1]];
             }
         } else if (0.5 - Math.abs(gamma) / Math.PI < Math.max(0.05, 0.5 / screen_scale[1])) {
-            if (gamma > 0) {
-                res = [[0, 0], [1, 1 - gamma / Math.PI]];
+            if (gamma < 0) {
+                res = [[0, 0], [1, 1 + gamma / Math.PI]];
             } else {
-                res = [[0, -gamma / Math.PI], [1, 1]];
+                res = [[0, gamma / Math.PI], [1, 1]];
             }
         } else {
             const size_x = Math.min(0.25, 0.25 * (1 + (Math.abs(gamma) / Math.PI > 0.4 ? 3 : 1) * Math.abs(gamma)) / screen_scale[0]);
             const size_y = Math.min(0.25, 0.25 * (1 + Math.abs(gamma)) / screen_scale[1]);
             res = [
-                [0.5 + beta / Math.PI / 2 - size_x, 0.5 - gamma / Math.PI - 2 * size_y],
-                [0.5 + beta / Math.PI / 2 + size_x, 0.5 - gamma / Math.PI + 2 * size_y]
+                [0.5 + beta / Math.PI / 2 - size_x, 0.5 + gamma / Math.PI - 2 * size_y],
+                [0.5 + beta / Math.PI / 2 + size_x, 0.5 + gamma / Math.PI + 2 * size_y]
             ];
         }
         res[0][0] = (1 + (res[0][0] % 1)) % 1;
