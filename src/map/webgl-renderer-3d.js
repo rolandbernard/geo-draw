@@ -1,15 +1,11 @@
 
-import TexturedFragmentShader from './shaders/textured-fragment-shader.glsl';
-import TexturedVertexShader from './shaders/textured-vertex-shader.glsl';
-import GlowFragmentShader from './shaders/glow-fragment-shader.glsl';
-import GlowVertexShader from './shaders/glow-vertex-shader.glsl';
+import EarthFragmentShader from './shaders/earth-fragment-shader.glsl';
+import EarthVertexShader from './shaders/earth-vertex-shader.glsl';
 
 import WebGLRenderer from './webgl-renderer';
 
 const TEXTURE_HEIGHT = 2048;
 const TEXTURE_WIDTH = 4096;
-
-const SPHERE_SEGMENTS = 25;
 
 export default class WebGLRenderer3d extends WebGLRenderer {
     projection(array) {
@@ -154,17 +150,6 @@ export default class WebGLRenderer3d extends WebGLRenderer {
 
     initForContext(canvas, gl, locations) {
         super.initForContext(canvas, gl, locations);
-        gl.enable(gl.DEPTH_TEST);
-        gl.enable(gl.BLEND);
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-
-        const texture_shader_program = this.createShaderProgram(gl, TexturedVertexShader, TexturedFragmentShader);
-        const texture_position_attribute = gl.getAttribLocation(texture_shader_program, 'aVertexPosition');
-        const texture_texcoord_attribute = gl.getAttribLocation(texture_shader_program, 'aTextureCoord');
-        const texture_transform_uniform = gl.getUniformLocation(texture_shader_program, 'uTransform');
-        const texture_sampler_uniform = gl.getUniformLocation(texture_shader_program, 'uSampler');
-        const texture_texmin_uniform = gl.getUniformLocation(texture_shader_program, 'uTexMin');
-        const texture_texmax_uniform = gl.getUniformLocation(texture_shader_program, 'uTexMax');
         
         const texture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -173,101 +158,54 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-        const sphere_vertices = new Float32Array(SPHERE_SEGMENTS * SPHERE_SEGMENTS * 3);
-        const sphere_texcoord = new Float32Array(SPHERE_SEGMENTS * SPHERE_SEGMENTS * 2);
-        let vertex_count = 0;
-        for (let j = 0; j < SPHERE_SEGMENTS; j++) {
-            for (let i = 0; i < SPHERE_SEGMENTS; i++) {
-                const alpha = Math.PI * j / (SPHERE_SEGMENTS - 1) - Math.PI / 2;
-                const beta = 2 * Math.PI * i / (SPHERE_SEGMENTS - 1);
-                sphere_vertices[vertex_count * 3 + 0] = Math.cos(alpha) * Math.sin(beta);
-                sphere_vertices[vertex_count * 3 + 1] = Math.sin(alpha);
-                sphere_vertices[vertex_count * 3 + 2] = Math.cos(alpha) * Math.cos(beta);
-                sphere_texcoord[vertex_count * 2 + 0] = 1 - i / (SPHERE_SEGMENTS - 1);
-                sphere_texcoord[vertex_count * 2 + 1] = j / (SPHERE_SEGMENTS - 1);
-                vertex_count++;
-            }
-        }
-        const sphere_triangles = new Uint16Array((SPHERE_SEGMENTS - 1) * SPHERE_SEGMENTS * 6);
-        let triangle_count = 0;
-        for (let j = 0; j < SPHERE_SEGMENTS - 1; j++) {
-            for (let i = 0; i < SPHERE_SEGMENTS; i++) {
-                sphere_triangles[triangle_count * 3 + 0] = (j + 1) * SPHERE_SEGMENTS + i;
-                sphere_triangles[triangle_count * 3 + 1] = j * SPHERE_SEGMENTS + (i + 1) % SPHERE_SEGMENTS;
-                sphere_triangles[triangle_count * 3 + 2] = j * SPHERE_SEGMENTS + i;
-                sphere_triangles[triangle_count * 3 + 3] = (j + 1) * SPHERE_SEGMENTS + i;
-                sphere_triangles[triangle_count * 3 + 4] = (j + 1) * SPHERE_SEGMENTS + (i + 1) % SPHERE_SEGMENTS;
-                sphere_triangles[triangle_count * 3 + 5] = j * SPHERE_SEGMENTS + (i + 1) % SPHERE_SEGMENTS;
-                triangle_count += 2;
-            }
-        }
-        const sphere_position_buffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, sphere_position_buffer);
-        gl.bufferData(gl.ARRAY_BUFFER, sphere_vertices, gl.STATIC_DRAW);
-        const sphere_index_buffer = gl.createBuffer();
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, sphere_index_buffer);
-        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, sphere_triangles, gl.STATIC_DRAW);
-        const sphere_texcoord_buffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, sphere_texcoord_buffer);
-        gl.bufferData(gl.ARRAY_BUFFER, sphere_texcoord, gl.STATIC_DRAW);
+        const earth_shader_program = this.createShaderProgram(gl, EarthVertexShader, EarthFragmentShader);
+        const earth_position_attribute = gl.getAttribLocation(earth_shader_program, 'aVertexPosition');
+        const earth_scale_uniform = gl.getUniformLocation(earth_shader_program, 'uScale');
+        const earth_sampler_uniform = gl.getUniformLocation(earth_shader_program, 'uSampler');
+        const earth_texmin_uniform = gl.getUniformLocation(earth_shader_program, 'uTexMin');
+        const earth_texmax_uniform = gl.getUniformLocation(earth_shader_program, 'uTexMax');
+        const earth_center_uniform = gl.getUniformLocation(earth_shader_program, 'uCenter');
 
-        const glow_shader_program = this.createShaderProgram(gl, GlowVertexShader, GlowFragmentShader);
-        const glow_position_attribute = gl.getAttribLocation(glow_shader_program, 'aVertexPosition');
-        const glow_scale_uniform = gl.getUniformLocation(glow_shader_program, 'uScale');
-
-        const glow_vertices = new Float32Array(8);
+        const earth_vertices = new Float32Array(8);
         {
-            glow_vertices[0] = -2;
-            glow_vertices[1] = 2;
-            glow_vertices[2] = 2;
-            glow_vertices[3] = 2;
-            glow_vertices[4] = 2;
-            glow_vertices[5] = -2;
-            glow_vertices[6] = -2;
-            glow_vertices[7] = -2;
+            earth_vertices[0] = -2;
+            earth_vertices[1] = 2;
+            earth_vertices[2] = 2;
+            earth_vertices[3] = 2;
+            earth_vertices[4] = 2;
+            earth_vertices[5] = -2;
+            earth_vertices[6] = -2;
+            earth_vertices[7] = -2;
         }
-        const glow_triangles = new Uint16Array(6);
+        const earth_triangles = new Uint16Array(6);
         {
-            glow_triangles[0] = 0;
-            glow_triangles[1] = 1;
-            glow_triangles[2] = 2;
-            glow_triangles[3] = 2;
-            glow_triangles[4] = 3;
-            glow_triangles[5] = 0;
+            earth_triangles[0] = 0;
+            earth_triangles[1] = 1;
+            earth_triangles[2] = 2;
+            earth_triangles[3] = 2;
+            earth_triangles[4] = 3;
+            earth_triangles[5] = 0;
         }
-        const glow_position_buffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, glow_position_buffer);
-        gl.bufferData(gl.ARRAY_BUFFER, glow_vertices, gl.STATIC_DRAW);
-        const glow_index_buffer = gl.createBuffer();
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, glow_index_buffer);
-        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, glow_triangles, gl.STATIC_DRAW);
+        const earth_position_buffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, earth_position_buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, earth_vertices, gl.STATIC_DRAW);
+        const earth_index_buffer = gl.createBuffer();
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, earth_index_buffer);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, earth_triangles, gl.STATIC_DRAW);
 
         this.webgl_data.texture = texture;
-        this.webgl_data.texture_data = {
-            shader_program: texture_shader_program,
-            position_attribute: texture_position_attribute,
-            texcoord_attribute: texture_texcoord_attribute,
-            transform_uniform: texture_transform_uniform,
-            sampler_uniform: texture_sampler_uniform,
-            texmin_uniform: texture_texmin_uniform,
-            texmax_uniform: texture_texmax_uniform,
-        };
-        this.webgl_data.sphere_data = {
-            vertices: sphere_vertices,
-            texcoord: sphere_texcoord,
-            triangles: sphere_triangles,
-            gl_position_buffer: sphere_position_buffer,
-            gl_index_buffer: sphere_index_buffer,
-            gl_texcoord_buffer: sphere_texcoord_buffer,
-        };
-        this.webgl_data.glow_data = {
-            shader_program: glow_shader_program,
-            position_attribute: glow_position_attribute,
-            scale_uniform: glow_scale_uniform,
-            vertices: glow_vertices,
-            triangles: glow_triangles,
-            gl_position_buffer: glow_position_buffer,
-            gl_index_buffer: glow_index_buffer,
+        this.webgl_data.earth_data = {
+            shader_program: earth_shader_program,
+            position_attribute: earth_position_attribute,
+            scale_uniform: earth_scale_uniform,
+            sampler_uniform: earth_sampler_uniform,
+            texmin_uniform: earth_texmin_uniform,
+            texmax_uniform: earth_texmax_uniform,
+            center_uniform: earth_center_uniform,
+            vertices: earth_vertices,
+            triangles: earth_triangles,
+            gl_position_buffer: earth_position_buffer,
+            gl_index_buffer: earth_index_buffer,
         };
     }
 
@@ -361,46 +299,30 @@ export default class WebGLRenderer3d extends WebGLRenderer {
 
     renderMapInContext(locations, state) {
         const gl = this.webgl_data.context;
-        const tex_data = this.webgl_data.texture_data;
-        const sphere_data = this.webgl_data.sphere_data;
-        const glow_data = this.webgl_data.glow_data;
+        const earth_data = this.webgl_data.earth_data;
         const [min, max] = this.generateTexMinMax(state);
 
         this.renderToTexture(locations, state, min, max);
 
         gl.clearColor(0.0, 0.0, 0.0, 0.0);
         gl.clearDepth(1);
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+
+        // Draw globe
+        gl.useProgram(earth_data.shader_program);
+        gl.uniform2fv(earth_data.scale_uniform, this.generateScale(state));
+        gl.uniform2fv(earth_data.scale_uniform, this.generateScale(state));
+        gl.uniform1i(earth_data.sampler_uniform, 0);
+        gl.uniform2fv(earth_data.texmin_uniform, min);
+        gl.uniform2fv(earth_data.texmax_uniform, max);
+        gl.uniform2fv(earth_data.center_uniform, state.center);
         
-        // Draw sphere
-        gl.useProgram(tex_data.shader_program);
-        gl.uniformMatrix4fv(tex_data.transform_uniform, false, this.generateTransform(state));
-        gl.uniform1i(tex_data.sampler_uniform, 0);
-        gl.uniform2fv(tex_data.texmin_uniform, min);
-        gl.uniform2fv(tex_data.texmax_uniform, max);
-        
-        gl.bindBuffer(gl.ARRAY_BUFFER, sphere_data.gl_position_buffer);
-        gl.vertexAttribPointer(tex_data.position_attribute, 3, gl.FLOAT, false, 0, 0);
-        gl.enableVertexAttribArray(tex_data.position_attribute);
+        gl.bindBuffer(gl.ARRAY_BUFFER, earth_data.gl_position_buffer);
+        gl.vertexAttribPointer(earth_data.position_attribute, 2, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(earth_data.position_attribute);
 
-        gl.bindBuffer(gl.ARRAY_BUFFER, sphere_data.gl_texcoord_buffer);
-        gl.vertexAttribPointer(tex_data.texcoord_attribute, 2, gl.FLOAT, false, 0, 0);
-        gl.enableVertexAttribArray(tex_data.texcoord_attribute);
-
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, sphere_data.gl_index_buffer);
-        gl.drawElements(gl.TRIANGLES, sphere_data.triangles.length, gl.UNSIGNED_SHORT, 0);
-
-        // Draw glow
-        gl.clear(gl.DEPTH_BUFFER_BIT);
-        gl.useProgram(glow_data.shader_program);
-        gl.uniform2fv(glow_data.scale_uniform, this.generateScale(state));
-        
-        gl.bindBuffer(gl.ARRAY_BUFFER, glow_data.gl_position_buffer);
-        gl.vertexAttribPointer(glow_data.position_attribute, 2, gl.FLOAT, false, 0, 0);
-        gl.enableVertexAttribArray(glow_data.position_attribute);
-
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, glow_data.gl_index_buffer);
-        gl.drawElements(gl.TRIANGLES, glow_data.triangles.length, gl.UNSIGNED_SHORT, 0);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, earth_data.gl_index_buffer);
+        gl.drawElements(gl.TRIANGLES, earth_data.triangles.length, gl.UNSIGNED_SHORT, 0);
     }
 }
 
