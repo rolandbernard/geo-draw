@@ -189,8 +189,8 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         return res;
     }
 
-    initForContext(canvas, gl, locations) {
-        super.initForContext(canvas, gl, locations);
+    initForContext(canvas, gl, locations, location_data) {
+        super.initForContext(canvas, gl, locations, location_data);
         
         const texture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -252,7 +252,7 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         };
     }
 
-    deinitResources(locations) {
+    deinitResources(locations, location_data) {
         if (this.webgl_data?.context) {
             const gl = this.webgl_data.context;
             gl.deleteTexture(this.webgl_data.texture);
@@ -263,10 +263,10 @@ export default class WebGLRenderer3d extends WebGLRenderer {
             });
             gl.deleteProgram(this.webgl_data.earth_data.shader_program);
         }
-        super.deinitResources(locations);
+        super.deinitResources(locations, location_data);
     }
 
-    renderToTexture(locations, state, min, max) {
+    renderToTexture(locations, location_data, state, min, max) {
         const gl = this.webgl_data.context;
         const fill_data = this.webgl_data.fill_data;
         const stroke_data = this.webgl_data.stroke_data;
@@ -293,7 +293,7 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         for (let x = 0; x <= 1; x++) {
             for (let i = 0; i < locations.length; i++) {
                 const loc = locations[i];
-                const triangles = loc.triangles;
+                const triangles = location_data[loc.id];
                 if (
                     (triangles.min[0] + translate[0]) * scale[0] <= 1
                     && (triangles.max[0] + translate[0]) * scale[0] >= -1
@@ -342,12 +342,12 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     }
 
-    renderMapInContext(locations, state) {
+    renderMapInContext(locations, location_data, state) {
         const gl = this.webgl_data.context;
         const earth_data = this.webgl_data.earth_data;
         const [min, max] = this.generateTexMinMax(state);
 
-        this.renderToTexture(locations, state, min, max);
+        this.renderToTexture(locations, location_data, state, min, max);
 
         gl.clearColor(0.0, 0.0, 0.0, 0.0);
         gl.clearDepth(1);

@@ -2,11 +2,12 @@
 import { LitElement, html, css } from 'lit-element';
 import { styleMap } from 'lit-html/directives/style-map';
 import { until } from 'lit-html/directives/until';
+import { cache } from 'lit-html/directives/cache';
 
 import '../ui/spinner';
 import { map as mapFromTo, hasWebGlSupport } from '../util';
 
-if(hasWebGlSupport()) {
+if (hasWebGlSupport()) {
     import(/* webpackChunkName: "map-backend-webgl" */ './map-backend-webgl');
 } else {
     import(/* webpackChunkName: "map-backend-svg" */ './map-backend-svg');
@@ -23,9 +24,11 @@ export default class MapRenderer extends LitElement {
     static get properties() {
         return {
             data: { type: Object },
+            render3d: { state: true },
+            details: { state: true },
         };
     }
-    
+
     static get styles() {
         return css`
             * {
@@ -227,13 +230,30 @@ export default class MapRenderer extends LitElement {
                 white-space: nowrap;
                 text-transform: uppercase;
             }
+            #option-box {
+                position: absolute;
+                left: 0.5rem;
+                bottom: 0.5rem;
+                display: flex;
+                flex-flow: column;
+            }
+            #option-box div {
+                padding: 0.25rem;
+                text-shadow: black 0px 0px 10px;
+            }
         `;
+    }
+
+    constructor() {
+        super();
+        this.render3d = false;
+        this.details = true;
     }
 
     static parseBinaryData(array_buffer) {
         const uint8_array = new Uint8Array(array_buffer);
         let len = 0;
-        while(uint8_array[len] != 0) {
+        while (uint8_array[len] != 0) {
             len++;
         }
         const string_part = new Uint8Array(array_buffer, 0, len);
@@ -272,7 +292,7 @@ export default class MapRenderer extends LitElement {
             ((() => {
                 if (Math.abs(lat) > 85) {
                     lat = Math.sign(lat) * 85;
-                } 
+                }
                 const phi = lat;
                 return Math.PI - Math.log(Math.tan(Math.PI / 4 + phi / 2));
             })())
@@ -288,7 +308,7 @@ export default class MapRenderer extends LitElement {
 
     static parseColor(str) {
         const match = str.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
-        if(match) {
+        if (match) {
             return [parseInt(match[1], 16), parseInt(match[2], 16), parseInt(match[3], 16)];
         } else {
             return [255, 255, 255];
@@ -301,7 +321,7 @@ export default class MapRenderer extends LitElement {
         if (sum === 0) {
             return colors[0] || ret;
         } else {
-            colors.forEach((col, i) => ret.forEach((el, j) => ret[j] += col[j]*col[j]*proportion[i]));
+            colors.forEach((col, i) => ret.forEach((el, j) => ret[j] += col[j] * col[j] * proportion[i]));
             return ret.map(el => Math.sqrt(el / sum));
         }
     }
@@ -309,54 +329,52 @@ export default class MapRenderer extends LitElement {
     static colorPropScale(prop) {
         return Math.log10(99 * prop + 1) / 2;
     }
-    
-    constructor() {
-        super();
-    }
 
     handleLocationHover(event) {
-        const info_box = this.shadowRoot.getElementById('info-box-wrapper');
-        if(event.location && event.position) {
-            const name = this.shadowRoot.getElementById('info-box-name');
-            const map_wrapper = this.shadowRoot.getElementById('map-wrapper');
-            name.innerText = event.location.name.split(',')[0];
-            Array.from(info_box.getElementsByClassName('info-field-value')).forEach((el, i) => {
-                el.innerText = (Math.round(event.location.data[i] * 100) / 100).toLocaleString();
-            });
-            const map_wrapper_pos = map_wrapper.getBoundingClientRect();
-            let x = event.position[0] - map_wrapper_pos.x;
-            let y = event.position[1] - map_wrapper_pos.y;
-            {
-                const y = Math.min(Math.max(y, 0), map_wrapper_pos.height);
-                info_box.style.setProperty('--anchor-point', (x / map_wrapper_pos.width * 90 + 5) + '%');
-                info_box.style.setProperty('--anchor-at-bottom', (y > ((info_box.clientHeight + 12) * 1.2)) ? 1 : 0);
-            }
-            info_box.style.left = x + 'px';
-            info_box.style.top = y + 'px';
-            info_box.classList.add('visible');
-            const info_box_pos = info_box.getBoundingClientRect();
-            if (info_box_pos.x < 4) {
-                x = Math.max(x, 8.5);
-                y = Math.min(Math.max(y, info_box_pos.height * 0.1), map_wrapper_pos.height - info_box_pos.height * 0.1);
-                info_box.style.setProperty('--anchor-point', '0%');
-                info_box.style.setProperty('--anchor-at-bottom', (y / map_wrapper_pos.height * 0.8 + 0.1));
-            } else if (info_box_pos.x + info_box_pos.width + 4 > map_wrapper_pos.x + map_wrapper_pos.width) {
-                x = Math.min(x, map_wrapper_pos.width - 8.5);
-                y = Math.min(Math.max(y, info_box_pos.height * 0.1), map_wrapper_pos.height - info_box_pos.height * 0.1);
-                info_box.style.setProperty('--anchor-point', '100%');
-                info_box.style.setProperty('--anchor-at-bottom', (y / map_wrapper_pos.height * 0.8 + 0.1));
-            } else {
-                y = Math.min(Math.max(y, 0), map_wrapper_pos.height);
-                info_box.style.setProperty('--anchor-point', (x / map_wrapper_pos.width * 90 + 5) + '%');
-                info_box.style.setProperty('--anchor-at-bottom', (y > ((info_box_pos.height + 12) * 1.2)) ? 1 : 0);
-            }
-            info_box.style.left = x + 'px';
-            info_box.style.top = y + 'px';
-            info_box.current_location = location;
-        } else {
+        if (this.details) {
             const info_box = this.shadowRoot.getElementById('info-box-wrapper');
-            info_box.classList.remove('visible');
-            info_box.current_location = null;
+            if (event.location && event.position) {
+                const name = this.shadowRoot.getElementById('info-box-name');
+                const map_wrapper = this.shadowRoot.getElementById('map-wrapper');
+                name.innerText = event.location.name.split(',')[0];
+                Array.from(info_box.getElementsByClassName('info-field-value')).forEach((el, i) => {
+                    el.innerText = (Math.round(event.location.data[i] * 100) / 100).toLocaleString();
+                });
+                const map_wrapper_pos = map_wrapper.getBoundingClientRect();
+                let x = event.position[0] - map_wrapper_pos.x;
+                let y = event.position[1] - map_wrapper_pos.y;
+                {
+                    const y = Math.min(Math.max(y, 0), map_wrapper_pos.height);
+                    info_box.style.setProperty('--anchor-point', (x / map_wrapper_pos.width * 90 + 5) + '%');
+                    info_box.style.setProperty('--anchor-at-bottom', (y > ((info_box.clientHeight + 12) * 1.2)) ? 1 : 0);
+                }
+                info_box.style.left = x + 'px';
+                info_box.style.top = y + 'px';
+                info_box.classList.add('visible');
+                const info_box_pos = info_box.getBoundingClientRect();
+                if (info_box_pos.x < 4) {
+                    x = Math.max(x, 8.5);
+                    y = Math.min(Math.max(y, info_box_pos.height * 0.1), map_wrapper_pos.height - info_box_pos.height * 0.1);
+                    info_box.style.setProperty('--anchor-point', '0%');
+                    info_box.style.setProperty('--anchor-at-bottom', (y / map_wrapper_pos.height * 0.8 + 0.1));
+                } else if (info_box_pos.x + info_box_pos.width + 4 > map_wrapper_pos.x + map_wrapper_pos.width) {
+                    x = Math.min(x, map_wrapper_pos.width - 8.5);
+                    y = Math.min(Math.max(y, info_box_pos.height * 0.1), map_wrapper_pos.height - info_box_pos.height * 0.1);
+                    info_box.style.setProperty('--anchor-point', '100%');
+                    info_box.style.setProperty('--anchor-at-bottom', (y / map_wrapper_pos.height * 0.8 + 0.1));
+                } else {
+                    y = Math.min(Math.max(y, 0), map_wrapper_pos.height);
+                    info_box.style.setProperty('--anchor-point', (x / map_wrapper_pos.width * 90 + 5) + '%');
+                    info_box.style.setProperty('--anchor-at-bottom', (y > ((info_box_pos.height + 12) * 1.2)) ? 1 : 0);
+                }
+                info_box.style.left = x + 'px';
+                info_box.style.top = y + 'px';
+                info_box.current_location = location;
+            } else {
+                const info_box = this.shadowRoot.getElementById('info-box-wrapper');
+                info_box.classList.remove('visible');
+                info_box.current_location = null;
+            }
         }
     }
 
@@ -410,21 +428,21 @@ export default class MapRenderer extends LitElement {
 
     handleTouchStart(event) {
         event.preventDefault();
-        if(event.touches.length == 2 || event.touches.length == 1) {
+        if (event.touches.length == 2 || event.touches.length == 1) {
             this.avg_touch_pos = Array.from(event.touches)
                 .map(touch => [touch.clientX, touch.clientY])
                 .reduce((a, b) => [a[0] + b[0], a[1] + b[1]]).map(el => el / event.touches.length);
-            if(event.touches.length == 2) {
+            if (event.touches.length == 2) {
                 const touch_array = [[event.touches[0].clientX, event.touches[0].clientY], [event.touches[1].clientX, event.touches[1].clientY]];
                 const diff = [touch_array[0][0] - touch_array[1][0], touch_array[0][1] - touch_array[1][1]];
-                this.touch_dist = (diff[0]*diff[0] + diff[1]*diff[1]);
+                this.touch_dist = (diff[0] * diff[0] + diff[1] * diff[1]);
             }
         }
     }
 
     handleTouchMove(event) {
         event.preventDefault();
-        if(event.touches.length == 2 || event.touches.length == 1) {
+        if (event.touches.length == 2 || event.touches.length == 1) {
             const map = this.shadowRoot.getElementById('map-backend');
             // Translation
             const new_touch_pos = Array.from(event.touches)
@@ -436,12 +454,12 @@ export default class MapRenderer extends LitElement {
             const diff = [current_map_pos[0] - last_map_pos[0], current_map_pos[1] - last_map_pos[1]];
             let new_center = [map.center[0] - diff[0], map.center[1] - diff[1]];
             let new_scale = map.scale;
-            if(event.touches.length == 2) {
+            if (event.touches.length == 2) {
                 // Scaling
                 const touch_array = [[event.touches[0].clientX, event.touches[0].clientY], [event.touches[1].clientX, event.touches[1].clientY]];
                 const touch_diff = [touch_array[0][0] - touch_array[1][0], touch_array[0][1] - touch_array[1][1]];
-                const new_touch_dist = (touch_diff[0]*touch_diff[0] + touch_diff[1]*touch_diff[1]);
-                if(this.touch_dist !== 0 && new_touch_dist !== 0) {
+                const new_touch_dist = (touch_diff[0] * touch_diff[0] + touch_diff[1] * touch_diff[1]);
+                if (this.touch_dist !== 0 && new_touch_dist !== 0) {
                     new_scale *= new_touch_dist / this.touch_dist;
                     this.touch_dist = new_touch_dist;
                     new_scale = Math.min(Math.max(MIN_ZOOM, new_scale), MAX_ZOOM);
@@ -455,7 +473,7 @@ export default class MapRenderer extends LitElement {
             map.setCenterAndScale(new_center, new_scale);
         }
     }
-    
+
     handleTouchEnd(event) {
         event.preventDefault();
         this.avg_touch_pos = Array.from(event.touches)
@@ -505,17 +523,25 @@ export default class MapRenderer extends LitElement {
             }
         }));
     }
-    
+
     handleOptionChange(event) {
         const option = event.target.value;
         this.data = { ...this.data, ...this.data.options[option], option_selected: option };
+    }
+
+    handleDetailsChange(event) {
+        this.details = event.target.checked;
+    }
+
+    handle3dChange(event) {
+        this.render3d = event.target.checked;
     }
 
     drawMap(locations_data) {
         const data = this.data;
         try {
             if (data?.locations?.length > 0) {
-                if(data.title) {
+                if (data.title) {
                     document.title = data.title;
                 }
                 const color_data = data.data.map(row => data.color_using ? data.color_using.map(el => row[el]) : row);
@@ -542,7 +568,7 @@ export default class MapRenderer extends LitElement {
                 const locations = locations_data
                     .map((loc, i) => loc ? { ...loc, color: colors[i], data: data.data[i], columns: data.columns } : null)
                     .filter(loc => loc);
-                if(locations.length == 0) {
+                if (locations.length == 0) {
                     throw 'No data';
                 }
                 const data_min = color_data.reduce((a, b) => a.map((el, i) => Math.min(el, b[i])));
@@ -556,78 +582,101 @@ export default class MapRenderer extends LitElement {
                         @touchmove="${this.handleTouchMove}"
                         @touchend="${this.handleTouchEnd}"
                     >
-                        <div id="info-box-wrapper">
-                            <div id="info-box-background"></div>
-                            <div id="info-box">
-                                <div id="info-box-name"></div>
-                                <hr />
-                                <div class="info-field">
-                                    ${data.columns.map(col => (html`
-                                        <span class="info-field-name">${col}</span>
-                                        <span class="info-field-value"></span>
-                                    `))}
-                                </div>
-                            </div>
-                        </div>
-                        <map-backend
-                            id="map-backend"
-                            .locations="${locations}"
-                            @hover="${this.handleLocationHover}"
-                        ></map-backend>
+                        ${this.details
+                            ? html`
+                                <div id="info-box-wrapper">
+                                    <div id="info-box-background"></div>
+                                    <div id="info-box">
+                                        <div id="info-box-name"></div>
+                                        <hr />
+                                        <div class="info-field">
+                                            ${data.columns.map(col => (html`
+                                                <span class="info-field-name">${col}</span>
+                                                <span class="info-field-value"></span>
+                                            `))}
+                                        </div>
+                                    </div>
+                                </div>`
+                            : html``
+                        }
+                        ${cache(this.render3d
+                            ? html`
+                                <map-backend-3d
+                                    id="map-backend"
+                                    .locations="${locations}"
+                                    @hover="${this.handleLocationHover}"
+                                ></map-backend-3d>`
+                            : html`
+                                <map-backend
+                                    id="map-backend"
+                                    .locations="${locations}"
+                                    @hover="${this.handleLocationHover}"
+                                ></map-backend>`
+                        )}
                     </div>
                     <div class="title">${data.title}</div>
+                    <div id="option-box">
+                        <div>
+                            <input type="checkbox" id="details" ?checked=${this.details} @change=${this.handleDetailsChange}>
+                            <label for="details">Details</label>
+                        </div>
+                        ${this.data.allow_3d && hasWebGlSupport()
+                            ? html`
+                                <div>
+                                    <input type="checkbox" id="render3d" ?checked=${this.render3d} @change=${this.handle3dChange}>
+                                    <label for="render3d">3D</label>
+                                </div>`
+                            : html``
+                        }
+                    </div>
                     <div id="map-legend">
                         <div class="current-legend">
-                        ${
-                            color_data?.[0]?.length > 1
-                                ? (data.colors.map((col, i) => (html`
+                        ${color_data?.[0]?.length > 1
+                        ? (data.colors.map((col, i) => (html`
                                     <div class="legend-item">
                                         <span class="color-block" style="${styleMap({
-                                            background: col,
-                                        })}"></span>
+                            background: col,
+                        })}"></span>
                                         <span class="legend-label">${data.color_using ? data.columns[data.color_using[i]] : data.color_using[i]}</span>
                                     </div>
                                 ` )))
-                                : (data.colors.length >= 1
-                                    ? (html`
+                        : (data.colors.length >= 1
+                            ? (html`
                                         <div class="legend-item">
-                                            ${
-                                                data.options
-                                                    ? null
-                                                    : html`
+                                            ${data.options
+                                    ? null
+                                    : html`
                                                         <span class="legend-label">${data.color_using ? data.columns[data.color_using[0]] : data.color_using[0]}</span>
                                                     `
-                                            }
+                                }
                                             <span class="color-gradiant">
                                                 <span>${(Math.round(data_max[0] * 100) / 100).toLocaleString()}</span>
                                                 <span class="scale" style="${styleMap({
-                                                    background: `linear-gradient(${data.colors[0]},${data.defcolor})`,
-                                                })}"></span>
+                                    background: `linear-gradient(${data.colors[0]},${data.defcolor})`,
+                                })}"></span>
                                                 <span>${(Math.round(data_min[0] * 100) / 100).toLocaleString()}</span>
                                             </span>
                                         </div>
                                     `)
-                                    : null
-                                )
-                        }
+                            : null
+                        )
+                    }
                         </div>
-                        ${
-                            data.options
-                            ? html`
+                        ${data.options
+                        ? html`
                                 <select
                                     class="select-option"
                                     @change="${this.handleOptionChange}"
-                                >${
-                                    data.options.map((option, i) => html`
+                                >${data.options.map((option, i) => html`
                                         <option
                                             value="${i}"
                                             ?selected="${i == data.option_selected}"
                                         >${option.name}</option>
                                     `)
-                                }</select>
+                            }</select>
                             `
-                            : null
-                        }
+                        : null
+                    }
                     </div>
                 `;
             } else {

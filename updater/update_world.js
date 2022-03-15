@@ -854,6 +854,7 @@ try {
                 color_using: [ i ]
             })),
             option_selected: 2,
+            allow_3d: true,
         };
         fs.writeFileSync(path.join(__dirname, `../static/demo/covid-world-${formatted_date}.json`), JSON.stringify(output));
         fs.writeFileSync(path.join(__dirname, '../static/demo/covid-world-newest.json'), JSON.stringify(output));

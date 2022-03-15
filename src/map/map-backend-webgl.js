@@ -5,13 +5,12 @@ import earcut from 'earcut';
 import WebGLRenderer from './webgl-renderer';
 import WebGLRenderer3d from './webgl-renderer-3d';
 
-const location_data_cache = {};
-
 class MapBackendWebGl extends LitElement {
 
     static get properties() {
         return {
-            locations: { attribute: true,  }
+            locations: { attribute: true },
+            render3d: { type: Boolean }
         }
     }
 
@@ -34,9 +33,14 @@ class MapBackendWebGl extends LitElement {
         `;
     }
 
+    newRenderer() {
+        return new WebGLRenderer();
+    }
+
     constructor() {
         super();
-        this.renderer = new WebGLRenderer3d();
+        this.location_data = {};
+        this.renderer = this.newRenderer();
         this.state = {
             center: [0, 0],
             scale: 1,
@@ -81,9 +85,10 @@ class MapBackendWebGl extends LitElement {
     handleMouseMove(event) {
         const pos = this.clientPosToProjPos([event.clientX, event.clientY]);
         for(const loc of this.locations) {
-            if(loc.triangles.min[0] <= pos[0] && loc.triangles.min[1] <= pos[1] &&
-                loc.triangles.max[0] >= pos[0] && loc.triangles.max[1] >= pos[1]) {
-                for(const polygon of loc.triangles.polygons) {
+            const triangles = this.location_data[loc.id];
+            if(triangles.min[0] <= pos[0] && triangles.min[1] <= pos[1] &&
+                triangles.max[0] >= pos[0] && triangles.max[1] >= pos[1]) {
+                for(const polygon of triangles.polygons) {
                     if(polygon.min[0] <= pos[0] && polygon.min[1] <= pos[1] &&
                         polygon.max[0] >= pos[0] && polygon.max[1] >= pos[1]) {
                         for(let i = 0; i < polygon.triangles.length; i += 3) {
@@ -152,33 +157,30 @@ class MapBackendWebGl extends LitElement {
             || this.last.hover != this.state.hover
             || this.last.size != this.state.size
         ) {
-            this.renderer.renderMapInContext(this.locations, this.state)
+            this.renderer.renderMapInContext(this.locations, this.location_data, this.state)
             this.last = { ...this.state };
         }
         window.requestAnimationFrame(this.renderMapInCanvas.bind(this));
     }
 
-    firstUpdated() {
-        const canvas = this.shadowRoot.getElementById('map');
-        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-        const handleResize = () => {
-            canvas.width = canvas.clientWidth;
-            canvas.height = canvas.clientHeight;
-            gl.viewport(0, 0, canvas.width, canvas.height);
-            this.state.size = [canvas.width, canvas.height];
-        }
-        window.addEventListener('resize', handleResize);
-        handleResize();
-        this.renderer.initForContext(canvas, gl, this.locations);
-        this.renderMapInCanvas();
-    }
-
     updated() {
+        const canvas = this.shadowRoot.getElementById('map');
+        if (this.last_canvas != canvas) {
+            this.last_canvas = canvas;
+            this.renderer.deinitResources(this.locations, this.location_data);
+            const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+            const handleResize = () => {
+                canvas.width = canvas.clientWidth;
+                canvas.height = canvas.clientHeight;
+                gl.viewport(0, 0, canvas.width, canvas.height);
+                this.state.size = [canvas.width, canvas.height];
+            }
+            window.addEventListener('resize', handleResize);
+            handleResize();
+            this.renderer.initForContext(canvas, gl, this.locations, this.location_data);
+            this.renderMapInCanvas();
+        }
         this.last = null;
-    }
-
-    disconnectedCallback() {
-        this.renderer.deinitResources(this.locations);
     }
 
     generateTriangles(location) {
@@ -258,15 +260,14 @@ class MapBackendWebGl extends LitElement {
         this.locations.forEach(loc => {
             loc.color = loc.color.map(el => el / 255);
             if (loc) {
-                if (!location_data_cache[loc.id]) {
-                    location_data_cache[loc.id] = this.generateTriangles(loc);
+                if (!this.location_data[loc.id]) {
+                    this.location_data[loc.id] = this.generateTriangles(loc);
                 }
-                loc.triangles = location_data_cache[loc.id];
             }
         });
-        this.state.min = this.locations.map(l => l.triangles.min)
+        this.state.min = this.locations.map(l => this.location_data[l.id].min)
             .reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]);
-        this.state.max = this.locations.map(l => l.triangles.max)
+        this.state.max = this.locations.map(l => this.location_data[l.id].max)
             .reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]);
     }
 
@@ -284,7 +285,15 @@ class MapBackendWebGl extends LitElement {
             </canvas>
         `;
     }
-
 }
 
 customElements.define('map-backend', MapBackendWebGl);
+
+class MapBackendWebGl3d extends MapBackendWebGl {
+    newRenderer() {
+        return new WebGLRenderer3d();
+    }
+}
+
+customElements.define('map-backend-3d', MapBackendWebGl3d);
+

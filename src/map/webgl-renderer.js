@@ -101,7 +101,7 @@ export default class WebGLRenderer {
         return shader_program;
     }
 
-    initForContext(canvas, gl, locations) {
+    initForContext(canvas, gl, locations, location_data) {
         const fill_shader_program = this.createShaderProgram(gl, FillVertexShader, FillFragmentShader);
         const fill_position_attribute = gl.getAttribLocation(fill_shader_program, 'aVertexPosition');
         const fill_translate_uniform = gl.getUniformLocation(fill_shader_program, 'uTranslate');
@@ -118,7 +118,7 @@ export default class WebGLRenderer {
         const stroke_color_uniform = gl.getUniformLocation(stroke_shader_program, 'uStrokeColor');
 
         for(const location of locations) {
-            const triangles = location.triangles;
+            const triangles = location_data[location.id];
             const position_buffer = gl.createBuffer();
             gl.bindBuffer(gl.ARRAY_BUFFER, position_buffer);
             gl.bufferData(gl.ARRAY_BUFFER, triangles.vertices, gl.STATIC_DRAW);
@@ -160,14 +160,15 @@ export default class WebGLRenderer {
         };
     }
 
-    deinitResources(locations) {
+    deinitResources(locations, location_data) {
         if (this.webgl_data?.context) {
             const gl = this.webgl_data.context;
             for (const location of locations) {
-                gl.deleteBuffer(location.gl_position_buffer);
-                gl.deleteBuffer(location.gl_index_buffer);
-                gl.deleteBuffer(location.gl_outline_position_buffer);
-                gl.deleteBuffer(location.gl_outline_normal_buffer);
+                const triangles = location_data[location.id];
+                gl.deleteBuffer(triangles.gl_position_buffer);
+                gl.deleteBuffer(triangles.gl_index_buffer);
+                gl.deleteBuffer(triangles.gl_outline_position_buffer);
+                gl.deleteBuffer(triangles.gl_outline_normal_buffer);
             }
             gl.getAttachedShaders(this.webgl_data.fill_data.shader_program).forEach(s => {
                 gl.deleteShader(s);
@@ -180,7 +181,7 @@ export default class WebGLRenderer {
         }
     }
 
-    renderMapInContext(locations, state) {
+    renderMapInContext(locations, location_data, state) {
         const gl = this.webgl_data.context;
         const fill_data = this.webgl_data.fill_data;
         const stroke_data = this.webgl_data.stroke_data;
@@ -192,7 +193,7 @@ export default class WebGLRenderer {
 
         for (let i = 0; i < locations.length; i++) {
             const loc = locations[i];
-            const triangles = loc.triangles;
+            const triangles = location_data[loc.id];
             // Draw stroke
             gl.useProgram(stroke_data.shader_program);
             gl.uniform2fv(stroke_data.translate_uniform, translate);

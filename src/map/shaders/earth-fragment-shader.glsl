@@ -77,32 +77,31 @@ void main() {
     vec3 pos = spherePosition();
     float dist = vPixelPos.x * vPixelPos.x + vPixelPos.y * vPixelPos.y;
     float edge = (dist - 1.0) * (dist - 1.0);
-    if (dist < 1.0) {
-        vec2 texCoord = texPosition(pos);
-        if (uTexMin.x <= 1.0 + texCoord.x && uTexMax.x >= 1.0 + texCoord.x) {
-            vec2 texPos = vec2(
-                (texCoord.x + 1.0 - uTexMin.x) / (uTexMax.x - uTexMin.x),
-                (texCoord.y - uTexMin.y) / (uTexMax.y - uTexMin.y)
-            );
-            gl_FragColor = texture2D(uSampler, texPos);
-        } else {
-            vec2 texPos = vec2(
-                (texCoord.x - uTexMin.x) / (uTexMax.x - uTexMin.x),
-                (texCoord.y - uTexMin.y) / (uTexMax.y - uTexMin.y)
-            );
-            gl_FragColor = texture2D(uSampler, texPos);
-        }
-        if (length(gl_FragColor) == 0.0) {
-            gl_FragColor = vec4(waterColor(pos), 1.0);
-            water = true;
-        }
+    vec2 texCoord = texPosition(pos);
+    if (uTexMin.x <= 1.0 + texCoord.x && uTexMax.x >= 1.0 + texCoord.x) {
+        vec2 texPos = vec2(
+            (texCoord.x + 1.0 - uTexMin.x) / (uTexMax.x - uTexMin.x),
+            (texCoord.y - uTexMin.y) / (uTexMax.y - uTexMin.y)
+        );
+        gl_FragColor = texture2D(uSampler, texPos);
     } else {
+        vec2 texPos = vec2(
+            (texCoord.x - uTexMin.x) / (uTexMax.x - uTexMin.x),
+            (texCoord.y - uTexMin.y) / (uTexMax.y - uTexMin.y)
+        );
+        gl_FragColor = texture2D(uSampler, texPos);
+    }
+    if (length(gl_FragColor) == 0.0) {
+        gl_FragColor = vec4(waterColor(pos), 1.0);
+        water = true;
+    }
+    if (dist >= 1.0) {
         gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0);
     }
     float f = 0.75 * exp(-1.0e4 * edge);
     gl_FragColor = (1.0 - f) * gl_FragColor + f * vec4(0.5, 0.75, 1.0, 1.0);
     if (dist < 1.0) {
-        float f = 0.25 * exp(-1.0 / (2.0 - pos.z) * uScaleZ) + 0.25 * (1.0 - pos.z);
+        float f = 0.2 * exp(-1.0 / (2.0 - pos.z) * uScaleZ) + 0.2 * (1.0 - pos.z);
         gl_FragColor = (1.0 - f) * gl_FragColor + f * vec4(0.0, 0.75, 1.0, 1.0);
     }
     gl_FragColor.xyz = computeLight(pos, water) * gl_FragColor.xyz;
