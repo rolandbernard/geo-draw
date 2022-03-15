@@ -8,7 +8,7 @@
 uniform sampler2D uSampler;
 uniform vec2 uTexMin;
 uniform vec2 uTexMax;
-uniform vec2 uCenter;
+uniform mat3 uTransform;
 
 varying vec2 vPixelPos;
 
@@ -28,22 +28,19 @@ vec2 normalizePosition(vec2 pos) {
     }
     pos.x = fmod(pos.x + PI, 2.0 * PI);
     pos.x = fmod(2.0 * PI + pos.x, 2.0 * PI);
-    return vec2(pos.x / (2.0 * PI), (pos.y + PI / 2.0) / PI);
+    return vec2(pos.x - PI, pos.y);
 }
 
 vec2 texPosition() {
     vec3 pos = vec3(vPixelPos, 0.0);
-    pos.z = 1.0 - pos.x*pos.x - pos.y*pos.y;
-    if (pos.z < 0.0) {
-        pos.z = 0.0;
-    } else {
-        pos.z = sqrt(pos.z);
-    }
+    pos.z = sqrt(1.0 - pos.x*pos.x - pos.y*pos.y);
+    pos = uTransform * pos;
     vec2 coord = vec2(
-        uCenter.x + atan(pos.x, pos.z),
-        uCenter.y + atan(pos.y, sqrt(pos.x*pos.x + pos.z*pos.z))
+        atan(pos.x, pos.z),
+        atan(pos.y, sqrt(pos.x*pos.x + pos.z*pos.z))
     );
-    return normalizePosition(coord);
+    vec2 lonlat = normalizePosition(coord);
+    return vec2((lonlat.x + PI) / (2.0 * PI), (lonlat.y + PI / 2.0) / PI);
 }
 
 void main() {

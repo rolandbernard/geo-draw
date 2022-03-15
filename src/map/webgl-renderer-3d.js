@@ -16,45 +16,52 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         // This is a noop
     }
 
-    clientPosToMapPos(client_pos, map_pos, state) {
-        const { center } = state;
+    clientPosToSomePos(client_pos, map_pos, state) {
         const scale = this.generateScale(state);
         const pos = [
             (2 * (client_pos[0] - map_pos.x) / map_pos.width - 1.0) / scale[0],
             (1.0 - 2 * (client_pos[1] - map_pos.y) / map_pos.height) / scale[1],
             0
         ];
-        pos[2] = 1 - pos[0]*pos[0] - pos[1]*pos[1];
+        pos[2] = 1 - pos[0] * pos[0] - pos[1] * pos[1];
         if (pos[2] < 0) {
             pos[2] = 0;
         } else {
             pos[2] = Math.sqrt(pos[2]);
         }
+        const position = this.mat3VecMul(this.generateTransform(state), pos)
         const coord = [
-            center[0] + Math.atan2(pos[0], pos[2]),
-            center[1] + Math.atan2(pos[1], Math.sqrt(pos[0]*pos[0] + pos[2]*pos[2])),
+            Math.atan2(position[0], position[2]),
+            Math.atan2(position[1], Math.sqrt(position[0] * position[0] + position[2] * position[2])),
         ];
         return coord;
     }
 
+    clientPosToMapPos(client_pos, map_pos, state) {
+        const { center } = state;
+        const proj = this.clientPosToSomePos(client_pos, map_pos, state);
+        while (proj[0] < center[0] - Math.PI) {
+            proj[0] += 2 * Math.PI;
+        }
+        while (proj[0] > center[0] + Math.PI) {
+            proj[0] -= 2 * Math.PI;
+        }
+        while (proj[1] < center[1] - Math.PI) {
+            proj[1] += 2 * Math.PI;
+        }
+        while (proj[1] > center[1] + Math.PI) {
+            proj[1] -= 2 * Math.PI;
+        }
+        return proj;
+    }
+
     clientPosToProjPos(client_pos, map_pos, state) {
-        return this.normalizePosition(this.clientPosToMapPos(client_pos, map_pos, state));
+        return this.normalizePosition(this.clientPosToSomePos(client_pos, map_pos, state));
     }
 
     projPosToClientPos(proj_pos, map_pos, state) {
-        const { center } = state;
-        const coord = this.normalizePosition([
-            proj_pos[0] - center[0], proj_pos[1] - center[1],
-        ]);
-        const pos = [
-            Math.cos(coord[1]) * Math.sin(coord[0]),
-            Math.sin(coord[1]),
-        ];
-        const scale = this.generateScale(state);
-        return [
-            (pos[0] * scale[0] + 1) / 2 * map_pos.width + map_pos.x,
-            (1 - pos[1] * scale[1]) / 2 * map_pos.height + map_pos.y
-        ];
+        const position = this.mat3VecMul(this.generateTransform(state), pos)
+        return [0, 0];
     }
     
     generateScale({size, scale: zoom_scale}) {
@@ -67,30 +74,41 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         return scale;
     }
 
+    mat3Mul(a, b) {
+        const res = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+        for (let i = 0; i < 3; i++) {
+            for (let j = 0; j < 3; j++) {
+                for (let k = 0; k < 3; k++) {
+                    res[3*i + j] += a[3*i + k] * b[3*k + j];
+                }
+            }
+        }
+        return res;
+    }
+
+    mat3VecMul(a, v) {
+        const res = [0, 0, 0];
+        for (let i = 0; i < 3; i++) {
+            for (let j = 0; j < 3; j++) {
+                res[i] += a[3*j + i] * v[j];
+            }
+        }
+        return res;
+    }
+
+    mat3Rotation(axis, angle) {
+        const res = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+        res[3*axis + axis] = 1;
+        res[3*((axis + 1) % 3) + (axis + 1) % 3] = Math.cos(angle);
+        res[3*((axis + 2) % 3) + (axis + 1) % 3] = Math.sin(angle);
+        res[3*((axis + 1) % 3) + (axis + 2) % 3] = -Math.sin(angle);
+        res[3*((axis + 2) % 3) + (axis + 2) % 3] = Math.cos(angle);
+        return res;
+    }
+
     generateTransform(state) {
-        const {center} = state;
-        const scale = this.generateScale(state);
-        const alpha = 0;
-        const beta = -center[0];
-        const gamma = center[1];
-        return [
-            Math.cos(alpha) * Math.cos(beta) * scale[0],
-            (Math.cos(alpha) * Math.sin(beta) * Math.sin(gamma) - Math.sin(alpha) * Math.cos(gamma)) * scale[1],
-            (Math.cos(alpha) * Math.sin(beta) * Math.cos(gamma) + Math.sin(alpha) * Math.sin(gamma)),
-            0,
-
-            Math.sin(alpha) * Math.cos(beta) * scale[0],
-            (Math.sin(alpha) * Math.sin(beta) * Math.sin(gamma) + Math.cos(alpha) * Math.cos(gamma)) * scale[1],
-            (Math.sin(alpha) * Math.sin(beta) * Math.cos(gamma) - Math.cos(alpha) * Math.sin(gamma)),
-            0,
-
-            -Math.sin(beta) * scale[0],
-            Math.cos(beta) * Math.sin(gamma) * scale[1],
-            Math.cos(beta) * Math.cos(gamma),
-            0,
-
-            0, 0, 0, 1,
-        ];
+        const { center } = state;
+        return this.mat3Mul(this.mat3Rotation(0, center[1]), this.mat3Rotation(1, -center[0]))
     }
 
     normalizePosition([beta, gamma]) {
@@ -164,7 +182,7 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         const earth_sampler_uniform = gl.getUniformLocation(earth_shader_program, 'uSampler');
         const earth_texmin_uniform = gl.getUniformLocation(earth_shader_program, 'uTexMin');
         const earth_texmax_uniform = gl.getUniformLocation(earth_shader_program, 'uTexMax');
-        const earth_center_uniform = gl.getUniformLocation(earth_shader_program, 'uCenter');
+        const earth_transform_uniform = gl.getUniformLocation(earth_shader_program, 'uTransform');
 
         const earth_vertices = new Float32Array(8);
         {
@@ -201,7 +219,7 @@ export default class WebGLRenderer3d extends WebGLRenderer {
             sampler_uniform: earth_sampler_uniform,
             texmin_uniform: earth_texmin_uniform,
             texmax_uniform: earth_texmax_uniform,
-            center_uniform: earth_center_uniform,
+            transform_uniform: earth_transform_uniform,
             vertices: earth_vertices,
             triangles: earth_triangles,
             gl_position_buffer: earth_position_buffer,
@@ -211,13 +229,12 @@ export default class WebGLRenderer3d extends WebGLRenderer {
 
     deinitResources(locations) {
         gl.deleteTexture(this.webgl_data.texture);
-        gl.deleteBuffer(this.webgl_data.sphere_data.gl_position_buffer);
-        gl.deleteBuffer(this.webgl_data.sphere_data.gl_index_buffer);
-        gl.deleteBuffer(this.webgl_data.sphere_data.gl_texcoord_buffer);
-        gl.getAttachedShaders(this.webgl_data.texture_data.shader_program).forEach(s => {
+        gl.deleteBuffer(this.webgl_data.earth_data.gl_position_buffer);
+        gl.deleteBuffer(this.webgl_data.earth_data.gl_index_buffer);
+        gl.getAttachedShaders(this.webgl_data.earth_data.shader_program).forEach(s => {
             gl.deleteShader(s);
         });
-        gl.deleteProgram(this.webgl_data.texture_data.shader_program);
+        gl.deleteProgram(this.webgl_data.earth_data.shader_program);
         super.deinitResources(locations);
     }
 
@@ -315,7 +332,7 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         gl.uniform1i(earth_data.sampler_uniform, 0);
         gl.uniform2fv(earth_data.texmin_uniform, min);
         gl.uniform2fv(earth_data.texmax_uniform, max);
-        gl.uniform2fv(earth_data.center_uniform, state.center);
+        gl.uniformMatrix3fv(earth_data.transform_uniform, false, this.generateTransform(state));
         
         gl.bindBuffer(gl.ARRAY_BUFFER, earth_data.gl_position_buffer);
         gl.vertexAttribPointer(earth_data.position_attribute, 2, gl.FLOAT, false, 0, 0);
