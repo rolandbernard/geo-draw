@@ -9,6 +9,7 @@ uniform sampler2D uSampler;
 uniform vec2 uTexMin;
 uniform vec2 uTexMax;
 uniform mat3 uTransform;
+uniform float uScaleZ;
 
 varying vec2 vPixelPos;
 
@@ -101,7 +102,7 @@ void main() {
     float f = 0.75 * exp(-1.0e4 * edge);
     gl_FragColor = (1.0 - f) * gl_FragColor + f * vec4(0.5, 0.75, 1.0, 1.0);
     if (dist < 1.0) {
-        float f = 0.5 * (1.0 - pos.z);
+        float f = 0.25 * exp(-1.0 / (2.0 - pos.z) * uScaleZ) + 0.25 * (1.0 - pos.z);
         gl_FragColor = (1.0 - f) * gl_FragColor + f * vec4(0.0, 0.75, 1.0, 1.0);
     }
     gl_FragColor.xyz = computeLight(pos, water) * gl_FragColor.xyz;

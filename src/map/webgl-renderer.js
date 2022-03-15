@@ -164,12 +164,10 @@ export default class WebGLRenderer {
         if (this.webgl_data?.context) {
             const gl = this.webgl_data.context;
             for (const location of locations) {
-                for (const polygon of location.gl_data.polygons) {
-                    gl.deleteBuffer(polygon.gl_position_buffer);
-                    gl.deleteBuffer(polygon.gl_index_buffer);
-                    gl.deleteBuffer(polygon.gl_outline_position_buffer);
-                    gl.deleteBuffer(polygon.gl_outline_normal_buffer);
-                }
+                gl.deleteBuffer(location.gl_position_buffer);
+                gl.deleteBuffer(location.gl_index_buffer);
+                gl.deleteBuffer(location.gl_outline_position_buffer);
+                gl.deleteBuffer(location.gl_outline_normal_buffer);
             }
             gl.getAttachedShaders(this.webgl_data.fill_data.shader_program).forEach(s => {
                 gl.deleteShader(s);

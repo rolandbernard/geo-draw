@@ -5,6 +5,7 @@ import { until } from 'lit-html/directives/until';
 
 import '../ui/spinner';
 import { map as mapFromTo, hasWebGlSupport } from '../util';
+
 if(hasWebGlSupport()) {
     import(/* webpackChunkName: "map-backend-webgl" */ './map-backend-webgl');
 } else {
@@ -461,7 +462,17 @@ export default class MapRenderer extends LitElement {
             .map(touch => [touch.clientX, touch.clientY])
             .reduce((a, b) => [a[0] + b[0], a[1] + b[1]]).map(el => el / event.touches.length);
     }
-   
+
+    static getCachedLocations(locations) {
+        return locations.map(location => {
+            if (location in location_cache) {
+                return location_cache[location];
+            } else {
+                return null;
+            }
+        });
+    }
+
     static getLocations(locations) {
         return Promise.all(locations.map(async location => {
             if (location) {
@@ -500,11 +511,10 @@ export default class MapRenderer extends LitElement {
         this.data = { ...this.data, ...this.data.options[option], option_selected: option };
     }
 
-    async drawMap() {
+    drawMap(locations_data) {
         const data = this.data;
         try {
             if (data?.locations?.length > 0) {
-                const locations_promise = MapRenderer.getLocations(data.locations);
                 if(data.title) {
                     document.title = data.title;
                 }
@@ -529,7 +539,7 @@ export default class MapRenderer extends LitElement {
                 } else {
                     colors = data.locations.map(() => defcolor);
                 }
-                const locations = (await locations_promise)
+                const locations = locations_data
                     .map((loc, i) => loc ? { ...loc, color: colors[i], data: data.data[i], columns: data.columns } : null)
                     .filter(loc => loc);
                 if(locations.length == 0) {
@@ -629,13 +639,24 @@ export default class MapRenderer extends LitElement {
     }
 
     render() {
-        return html`
-            <div id="map-renderer-root">
-                ${until(this.drawMap(), html`<ui-spinner></ui-spinner>`)}
-            </div>
-        `;
+        const cached = MapRenderer.getCachedLocations(this.data.locations);
+        if (cached.includes(null)) {
+            return html`
+                <div id="map-renderer-root">
+                    ${until(
+                        (async () => this.drawMap(await MapRenderer.getLocations(this.data.locations)))(),
+                        html`<ui-spinner></ui-spinner>`
+                    )}
+                </div>
+            `;
+        } else {
+            return html`
+                <div id="map-renderer-root">
+                    ${this.drawMap(cached)}
+                </div>
+            `;
+        }
     }
-
 }
 
 customElements.define('map-renderer', MapRenderer);

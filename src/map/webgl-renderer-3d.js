@@ -202,6 +202,7 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         const earth_shader_program = this.createShaderProgram(gl, EarthVertexShader, EarthFragmentShader);
         const earth_position_attribute = gl.getAttribLocation(earth_shader_program, 'aVertexPosition');
         const earth_scale_uniform = gl.getUniformLocation(earth_shader_program, 'uScale');
+        const earth_scale2_uniform = gl.getUniformLocation(earth_shader_program, 'uScaleZ');
         const earth_sampler_uniform = gl.getUniformLocation(earth_shader_program, 'uSampler');
         const earth_texmin_uniform = gl.getUniformLocation(earth_shader_program, 'uTexMin');
         const earth_texmax_uniform = gl.getUniformLocation(earth_shader_program, 'uTexMax');
@@ -239,6 +240,7 @@ export default class WebGLRenderer3d extends WebGLRenderer {
             shader_program: earth_shader_program,
             position_attribute: earth_position_attribute,
             scale_uniform: earth_scale_uniform,
+            scale2_uniform: earth_scale2_uniform,
             sampler_uniform: earth_sampler_uniform,
             texmin_uniform: earth_texmin_uniform,
             texmax_uniform: earth_texmax_uniform,
@@ -251,13 +253,16 @@ export default class WebGLRenderer3d extends WebGLRenderer {
     }
 
     deinitResources(locations) {
-        gl.deleteTexture(this.webgl_data.texture);
-        gl.deleteBuffer(this.webgl_data.earth_data.gl_position_buffer);
-        gl.deleteBuffer(this.webgl_data.earth_data.gl_index_buffer);
-        gl.getAttachedShaders(this.webgl_data.earth_data.shader_program).forEach(s => {
-            gl.deleteShader(s);
-        });
-        gl.deleteProgram(this.webgl_data.earth_data.shader_program);
+        if (this.webgl_data?.context) {
+            const gl = this.webgl_data.context;
+            gl.deleteTexture(this.webgl_data.texture);
+            gl.deleteBuffer(this.webgl_data.earth_data.gl_position_buffer);
+            gl.deleteBuffer(this.webgl_data.earth_data.gl_index_buffer);
+            gl.getAttachedShaders(this.webgl_data.earth_data.shader_program).forEach(s => {
+                gl.deleteShader(s);
+            });
+            gl.deleteProgram(this.webgl_data.earth_data.shader_program);
+        }
         super.deinitResources(locations);
     }
 
@@ -352,6 +357,7 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         gl.useProgram(earth_data.shader_program);
         gl.uniform2fv(earth_data.scale_uniform, this.generateScale(state));
         gl.uniform2fv(earth_data.scale_uniform, this.generateScale(state));
+        gl.uniform1fv(earth_data.scale2_uniform, [state.scale]);
         gl.uniform1i(earth_data.sampler_uniform, 0);
         gl.uniform2fv(earth_data.texmin_uniform, min);
         gl.uniform2fv(earth_data.texmax_uniform, max);

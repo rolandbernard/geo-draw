@@ -11,7 +11,7 @@ class MapBackendWebGl extends LitElement {
 
     static get properties() {
         return {
-            locations: { type: Array }
+            locations: { attribute: true,  }
         }
     }
 
@@ -33,7 +33,7 @@ class MapBackendWebGl extends LitElement {
             }
         `;
     }
-    
+
     constructor() {
         super();
         this.renderer = new WebGLRenderer3d();
@@ -44,7 +44,7 @@ class MapBackendWebGl extends LitElement {
             max: [0, 0],
             size: [0, 0],
             hover: null,
-        }
+        };
     }
 
     get center() {
@@ -171,6 +171,10 @@ class MapBackendWebGl extends LitElement {
         handleResize();
         this.renderer.initForContext(canvas, gl, this.locations);
         this.renderMapInCanvas();
+    }
+
+    updated() {
+        this.last = null;
     }
 
     disconnectedCallback() {
