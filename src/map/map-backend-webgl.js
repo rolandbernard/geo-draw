@@ -2,20 +2,15 @@
 import { LitElement, html, css } from 'lit-element';
 import earcut from 'earcut';
 
-import { map } from '../util';
-
-import FillFragmentShader from './shaders/fill-fragment-shader.glsl';
-import FillVertexShader from './shaders/fill-vertex-shader.glsl';
-import StrokeFragmentShader from './shaders/stroke-fragment-shader.glsl';
-import StrokeVertexShader from './shaders/stroke-vertex-shader.glsl';
-
-const location_data_cache = {};
+import WebGLRenderer from './webgl-renderer';
+import WebGLRenderer3d from './webgl-renderer-3d';
 
 class MapBackendWebGl extends LitElement {
 
     static get properties() {
         return {
-            locations: { type: Array }
+            locations: { attribute: true },
+            render3d: { type: Boolean }
         }
     }
 
@@ -37,78 +32,63 @@ class MapBackendWebGl extends LitElement {
             }
         `;
     }
-    
+
+    newRenderer() {
+        return new WebGLRenderer();
+    }
+
     constructor() {
         super();
-        this.zoom_scale = 1;
-        this.zoom_center = [0, 0];
-        this.min = [0, 0];
-        this.max = [0, 0];
-        this.current_hover = null;
+        this.location_data = {};
+        this.renderer = this.newRenderer();
+        this.state = {
+            center: [0, 0],
+            scale: 1,
+            min: [0, 0],
+            max: [0, 0],
+            size: [0, 0],
+            hover: null,
+        };
     }
 
     get center() {
-        return this.zoom_center;
+        return this.state.center;
     }
 
     get scale() {
-        return this.zoom_scale;
+        return this.state.scale;
     }
 
     setCenterAndScale(center, scale) {
-        this.zoom_center = center;
-        this.zoom_scale = scale;
+        this.state.center = center;
+        this.state.scale = scale;
     }
     
     clientPosToMapPos(client_pos) {
         const map = this.shadowRoot.getElementById('map');
         const map_pos = map.getBoundingClientRect();
-        const [_, scale] = this.generateTranslateAndScale();
-        const client_pos_norm = [
-            2 * (client_pos[0] - map_pos.x) / map_pos.width - 1.0,
-            1.0 - 2 * (client_pos[1] - map_pos.y) / map_pos.height,
-        ];
-        return [
-            client_pos_norm[0] / scale[0] + this.zoom_center[0],
-            client_pos_norm[1] / scale[1] + this.zoom_center[1],
-        ];
+        return this.renderer.clientPosToMapPos(client_pos, map_pos, this.state);
     }
 
-    clientPosToLocationPos(client_pos) {
+    clientPosToProjPos(client_pos) {
         const map = this.shadowRoot.getElementById('map');
         const map_pos = map.getBoundingClientRect();
-        const [transform, scale] = this.generateTranslateAndScale();
-        const client_pos_norm = [
-            2 * (client_pos[0] - map_pos.x) / map_pos.width - 1.0,
-            1.0 - 2 * (client_pos[1] - map_pos.y) / map_pos.height,
-        ];
-        return [
-            client_pos_norm[0] / scale[0] - transform[0],
-            client_pos_norm[1] / scale[1] - transform[1],
-        ];
+        return this.renderer.clientPosToProjPos(client_pos, map_pos, this.state);
     }
     
-    locationPosToClientPos(location_pos) {
+    projPosToClientPos(location_pos) {
         const map = this.shadowRoot.getElementById('map');
         const map_pos = map.getBoundingClientRect();
-        const [transform, scale] = this.generateTranslateAndScale();
-        const client_pos_norm = [
-            (location_pos[0] + transform[0]) * scale[0],
-            (location_pos[1] + transform[1]) * scale[1],
-        ];
-        return [
-            (client_pos_norm[0] + 1.0) / 2 * map_pos.width + map_pos.x,
-            (1.0 - client_pos_norm[1]) / 2 * map_pos.height + map_pos.y,
-        ];
+        return this.renderer.projPosToClientPos(location_pos, map_pos, this.state);
     }
 
     handleMouseMove(event) {
-        const pos = this.clientPosToLocationPos([event.clientX, event.clientY]);
+        const pos = this.clientPosToProjPos([event.clientX, event.clientY]);
         for(const loc of this.locations) {
-            if(loc.min[0] <= pos[0] && loc.min[1] <= pos[1] &&
-                loc.max[0] >= pos[0] && loc.max[1] >= pos[1]) {
-                const location = location_data_cache[loc.id];
-                for(const polygon of location.polygons) {
+            const triangles = this.location_data[loc.id];
+            if(triangles.min[0] <= pos[0] && triangles.min[1] <= pos[1] &&
+                triangles.max[0] >= pos[0] && triangles.max[1] >= pos[1]) {
+                for(const polygon of triangles.polygons) {
                     if(polygon.min[0] <= pos[0] && polygon.min[1] <= pos[1] &&
                         polygon.max[0] >= pos[0] && polygon.max[1] >= pos[1]) {
                         for(let i = 0; i < polygon.triangles.length; i += 3) {
@@ -133,10 +113,10 @@ class MapBackendWebGl extends LitElement {
                             const has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
                             const has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
                             if(!(has_neg && has_pos)) {
-                                this.current_hover = loc.id;
+                                this.state.hover = loc.id;
                                 const my_event = new Event('hover');
                                 my_event.location = loc;
-                                my_event.position = this.locationPosToClientPos([
+                                my_event.position = this.projPosToClientPos([
                                     (polygon.min[0] + polygon.max[0]) / 2,
                                     (polygon.min[1] + polygon.max[1]) / 2
                                 ]);
@@ -152,7 +132,7 @@ class MapBackendWebGl extends LitElement {
     }
 
     handleMouseOut() {
-        this.current_hover = null;
+        this.state.hover = null;
         const my_event = new Event('hover');
         my_event.location = null;
         my_event.position = null;
@@ -170,268 +150,129 @@ class MapBackendWebGl extends LitElement {
         }
     }
     
-    generateTranslateAndScale() {
-        const width = this.max[0] - this.min[0];
-        const height = this.max[1] - this.min[1];
-        if(width / this.current_size[0] > height / this.current_size[1]) {
-            const translate = [
-                -this.min[0] - width / 2 - this.zoom_center[0],
-                -this.min[1] - height / 2 - this.zoom_center[1],
-            ];
-            const scale = [
-                2 / width * this.zoom_scale,
-                -2 * (this.current_size[0] / this.current_size[1]) / width * this.zoom_scale,
-            ];
-            const stroke_scale = [
-                1,
-                -this.current_size[0] / this.current_size[1],
-            ];
-            return [translate, scale, stroke_scale];
-        } else {
-            const translate = [
-                -this.min[0] - width / 2 - this.zoom_center[0],
-                -this.min[1] - height / 2 - this.zoom_center[1],
-            ];
-            const scale = [
-                2 * (this.current_size[1] / this.current_size[0]) / height * this.zoom_scale,
-                -2 /  height * this.zoom_scale,
-            ];
-            const stroke_scale = [
-                this.current_size[1] / this.current_size[0],
-                -1,
-            ];
-            return [translate, scale, stroke_scale];
-        }
-    }
-
     renderMapInCanvas() {
-        if (this.last_center != this.zoom_center
-            || this.last_scale != this.zoom_scale
-            || this.last_hover != this.current_hover
-            || this.last_size != this.current_size) {
-            const gl = this.webgl_data.context;
-            const fill_data = this.webgl_data.fill_data;
-            const stroke_data = this.webgl_data.stroke_data;
-
-            const [translate, scale, stroke_scale] = this.generateTranslateAndScale();
-            
-            gl.clearColor(0.0, 0.0, 0.0, 0.0);
-            gl.clear(gl.COLOR_BUFFER_BIT);
-            
-            for(const loc of this.locations) {
-                const location = location_data_cache[loc.id];
-                // Draw stroke
-                gl.useProgram(stroke_data.shader_program);
-                gl.uniform2fv(stroke_data.translate_uniform, translate);
-                gl.uniform2fv(stroke_data.scale_uniform, scale);
-                gl.uniform2fv(stroke_data.scale2_uniform, stroke_scale);
-                gl.uniform1f(stroke_data.width_uniform, 0.005);
-                gl.uniform3fv(stroke_data.color_uniform, [0.271, 0.302, 0.38]);
-                for(const polygon of location.polygons) {    
-                    gl.bindBuffer(gl.ARRAY_BUFFER, polygon.gl_outline_position_buffer);
-                    gl.vertexAttribPointer(stroke_data.position_attribute, 2, gl.FLOAT, false, 0, 0);
-                    gl.enableVertexAttribArray(stroke_data.position_attribute);
-
-                    gl.bindBuffer(gl.ARRAY_BUFFER, polygon.gl_outline_normal_buffer);
-                    gl.vertexAttribPointer(stroke_data.normal_attribute, 2, gl.FLOAT, false, 0, 0);
-                    gl.enableVertexAttribArray(stroke_data.normal_attribute);
-                    
-                    let offset = 0;
-                    for(const part of polygon.coords) {
-                        gl.drawArrays(gl.TRIANGLE_STRIP, offset * 4, (part.length + 1) * 4);
-                        offset += part.length + 1;
-                    }
-                }
-                // Draw fill
-                gl.useProgram(fill_data.shader_program);
-                gl.uniform2fv(fill_data.translate_uniform, translate);
-                gl.uniform2fv(fill_data.scale_uniform, scale);
-                if(loc.id === this.current_hover) {
-                    gl.uniform3fv(fill_data.color_uniform, loc.color.map(el => el * 0.8));
-                } else {
-                    gl.uniform3fv(fill_data.color_uniform, loc.color);
-                }
-                for(const polygon of location.polygons) {    
-                    gl.bindBuffer(gl.ARRAY_BUFFER, polygon.gl_position_buffer);
-                    gl.vertexAttribPointer(fill_data.position_attribute, 2, gl.FLOAT, false, 0, 0);
-                    gl.enableVertexAttribArray(fill_data.position_attribute);
-                    
-                    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, polygon.gl_index_buffer);
-                    
-                    gl.drawElements(gl.TRIANGLES, polygon.triangles.length, gl.UNSIGNED_SHORT, 0);
-                }
-            }
-            this.last_center = this.zoom_center;
-            this.last_scale = this.zoom_scale;
-            this.last_hover = this.current_hover;
-            this.last_size = this.current_size;
+        if (
+            !this.last || this.last.center != this.state.center
+            || this.last.scale != this.state.scale
+            || this.last.hover != this.state.hover
+            || this.last.size != this.state.size
+        ) {
+            this.renderer.renderMapInContext(this.locations, this.location_data, this.state)
+            this.last = { ...this.state };
         }
         window.requestAnimationFrame(this.renderMapInCanvas.bind(this));
     }
 
-    firstUpdated() {
+    updated() {
         const canvas = this.shadowRoot.getElementById('map');
-        this.current_size = [canvas.width, canvas.height];
-        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-        
-        function createShaderProgram(vertex_shader_source, fragment_shader_source) {
-            const vertex_shader = gl.createShader(gl.VERTEX_SHADER);
-            gl.shaderSource(vertex_shader, vertex_shader_source);
-            gl.compileShader(vertex_shader);
-            const fragment_shader = gl.createShader(gl.FRAGMENT_SHADER);
-            gl.shaderSource(fragment_shader, fragment_shader_source);
-            gl.compileShader(fragment_shader);
-            const shader_program = gl.createProgram();
-            gl.attachShader(shader_program, vertex_shader);
-            gl.attachShader(shader_program, fragment_shader);
-            gl.linkProgram(shader_program);
-            return shader_program;
-        }
-
-        const fill_shader_program = createShaderProgram(FillVertexShader, FillFragmentShader);
-        const fill_position_attribute = gl.getAttribLocation(fill_shader_program, 'aVertexPosition');
-        const fill_translate_uniform = gl.getUniformLocation(fill_shader_program, 'uTranslate');
-        const fill_scale_uniform = gl.getUniformLocation(fill_shader_program, 'uScale');
-        const fill_color_uniform = gl.getUniformLocation(fill_shader_program, 'uFillColor');
-
-        const stroke_shader_program = createShaderProgram(StrokeVertexShader, StrokeFragmentShader);
-        const stroke_position_attribute = gl.getAttribLocation(stroke_shader_program, 'aVertexPosition');
-        const stroke_normal_attribute = gl.getAttribLocation(stroke_shader_program, 'aVertexNormal');
-        const stroke_translate_uniform = gl.getUniformLocation(stroke_shader_program, 'uTranslate');
-        const stroke_scale_uniform = gl.getUniformLocation(stroke_shader_program, 'uScale');
-        const stroke_scale2_uniform = gl.getUniformLocation(stroke_shader_program, 'uStrokeScale');
-        const stroke_width_uniform = gl.getUniformLocation(stroke_shader_program, 'uWidth');
-        const stroke_color_uniform = gl.getUniformLocation(stroke_shader_program, 'uStrokeColor');
-
-        for(const location of this.locations) {
-            for(const polygon of location_data_cache[location.id].polygons) {
-                const position_buffer = gl.createBuffer();
-                gl.bindBuffer(gl.ARRAY_BUFFER, position_buffer);
-                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(polygon.vertices), gl.STATIC_DRAW);
-                const index_buffer = gl.createBuffer();
-                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
-                gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(polygon.triangles), gl.STATIC_DRAW);
-                const outline_position_buffer = gl.createBuffer();
-                gl.bindBuffer(gl.ARRAY_BUFFER, outline_position_buffer);
-                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(polygon.outline_vertices), gl.STATIC_DRAW);
-                const outline_normal_buffer = gl.createBuffer();
-                gl.bindBuffer(gl.ARRAY_BUFFER, outline_normal_buffer);
-                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(polygon.outline_normals), gl.STATIC_DRAW);
-                polygon.gl_position_buffer = position_buffer;
-                polygon.gl_index_buffer = index_buffer;
-                polygon.gl_outline_position_buffer = outline_position_buffer;
-                polygon.gl_outline_normal_buffer = outline_normal_buffer;
+        if (this.last_canvas != canvas) {
+            this.last_canvas = canvas;
+            this.renderer.deinitResources(this.locations, this.location_data);
+            const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+            const handleResize = () => {
+                canvas.width = canvas.clientWidth;
+                canvas.height = canvas.clientHeight;
+                gl.viewport(0, 0, canvas.width, canvas.height);
+                this.state.size = [canvas.width, canvas.height];
             }
+            window.addEventListener('resize', handleResize);
+            handleResize();
+            this.renderer.initForContext(canvas, gl, this.locations, this.location_data);
+            this.renderMapInCanvas();
         }
-        
-        const handleResize = () => {
-            canvas.width = canvas.clientWidth;
-            canvas.height = canvas.clientHeight;
-            gl.viewport(0, 0, canvas.width, canvas.height);
-            this.current_size = [canvas.width, canvas.height];
-        }
-        window.addEventListener('resize', handleResize);
-        handleResize();
-        
-        this.webgl_data = {
-            canvas: canvas,
-            context: gl,
-            fill_data: {
-                shader_program: fill_shader_program,
-                position_attribute: fill_position_attribute,
-                translate_uniform: fill_translate_uniform,
-                scale_uniform: fill_scale_uniform,
-                color_uniform: fill_color_uniform,
-            },
-            stroke_data: {
-                shader_program: stroke_shader_program,
-                position_attribute: stroke_position_attribute,
-                normal_attribute: stroke_normal_attribute,
-                translate_uniform: stroke_translate_uniform,
-                scale_uniform: stroke_scale_uniform,
-                scale2_uniform: stroke_scale2_uniform,
-                width_uniform: stroke_width_uniform,
-                color_uniform: stroke_color_uniform,
-            },
-        };
-        this.renderMapInCanvas();
+        this.last = null;
     }
 
-    disconnectedCallback() {
-        if (this.webgl_data?.context) {
-            const gl = this.webgl_data.context;
-            for (const location of this.locations) {
-                for (const polygon of location_data_cache[location.id].polygons) {
-                    gl.deleteBuffer(polygon.gl_position_buffer);
-                    gl.deleteBuffer(polygon.gl_index_buffer);
-                    gl.deleteBuffer(polygon.gl_outline_position_buffer);
-                    gl.deleteBuffer(polygon.gl_outline_normal_buffer);
+    generateTriangles(location) {
+        const polygons = [];
+        let vertex_count = 0;
+        let triangle_count = 0;
+        let outline_count = 0;
+        for (const poly of location.coords) {
+            for (const part of poly) {
+                outline_count += part.length;
+            }
+            const data = earcut.flatten(poly);
+            this.renderer.applyProjection(data.vertices);
+            const triangles = earcut(data.vertices, data.holes, data.dimensions);
+            vertex_count += data.vertices.length;
+            triangle_count += triangles.length;
+            polygons.push({
+                vertices: new Float32Array(data.vertices),
+                triangles: new Uint16Array(triangles),
+                min: poly.flat().map(this.renderer.projection)
+                    .reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
+                max: poly.flat().map(this.renderer.projection)
+                    .reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
+            });
+        }
+        const vertices = new Float32Array(vertex_count);
+        const triangles = new Uint16Array(triangle_count);
+        vertex_count = 0;
+        triangle_count = 0;
+        for (const poly of polygons) {
+            vertices.set(poly.vertices, vertex_count);
+            for (let i = 0; i < poly.triangles.length; i++) {
+                triangles[triangle_count + i] = vertex_count / 2 + poly.triangles[i];
+            }
+            vertex_count += poly.vertices.length;
+            triangle_count += poly.triangles.length;
+        }
+        const outline_triangles = new Float32Array(outline_count * 24);
+        const outline_normals = new Float32Array(outline_count * 24);
+        outline_count = 0;
+        for (const poly of location.coords) {
+            for (const raw_part of poly) {
+                const part = raw_part.map(this.renderer.projection)
+                for (let i = 0; i < part.length; i++) {
+                    const curr = part[i];
+                    const last = part[(part.length + i - 1) % part.length];
+                    const next = part[(i + 1) % part.length];
+                    const from_last = [curr[0] - last[0], curr[1] - last[1]];
+                    const to_next = [next[0] - curr[0], next[1] - curr[1]];
+                    const offset = outline_count * 24 + i * 24;
+                    outline_triangles.set([
+                        curr[0], curr[1],   curr[0], curr[1],   next[0], next[1], // Line
+                        curr[0], curr[1],   next[0], next[1],   next[0], next[1],
+
+                        curr[0], curr[1],   curr[0], curr[1],   curr[0], curr[1], // Corner
+                        curr[0], curr[1],   curr[0], curr[1],   curr[0], curr[1],
+                    ], offset);
+                    outline_normals.set([
+                        to_next[1], -to_next[0],   -to_next[1], to_next[0],   to_next[1], -to_next[0],
+                        -to_next[1], to_next[0],   -to_next[1], to_next[0],   to_next[1], -to_next[0],
+
+                        -from_last[1], from_last[0], from_last[1], -from_last[0], -to_next[1], to_next[0],
+                        -from_last[1], from_last[0], from_last[1], -from_last[0], to_next[1], -to_next[0],
+                    ], offset)
                 }
+                outline_count += part.length;
             }
-            gl.getAttachedShaders(this.webgl_data.fill_data.shader_program).forEach(s => {
-                gl.deleteShader(s);
-            });
-            gl.deleteProgram(this.webgl_data.fill_data.fill_shader_program);
-            gl.getAttachedShaders(this.webgl_data.stroke_data.shader_program).forEach(s => {
-                gl.deleteShader(s);
-            });
-            gl.deleteProgram(this.webgl_data.stroke_data.shader_program);
         }
+        return {
+            polygons, vertices, triangles, outline_triangles, outline_normals,
+            min: polygons.map(p => p.min).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
+            max: polygons.map(p => p.max).reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
+        };
     }
-    
-    render() {
-        const min = this.locations.filter(loc => loc).map(loc => loc.min).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]);
-        const max = this.locations.filter(loc => loc).map(loc => loc.max).reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]);
-        this.min = min;
-        this.max = max;
+
+    buildRenderData() {
         this.locations.forEach(loc => {
             loc.color = loc.color.map(el => el / 255);
-            if(loc && !location_data_cache[loc.id]) {
-                location_data_cache[loc.id] = {
-                    polygons: loc.coords.map(poly => {
-                        const data = earcut.flatten(poly);
-                        const triangles = earcut(data.vertices, data.holes, data.dimensions);
-                        return {
-                            coords: poly,
-                            vertices: data.vertices,
-                            triangles: triangles,
-                            outline_vertices: poly.map(part => (
-                                part.reduce((arr,coord) => arr.concat([coord, coord, coord, coord]), [])
-                                    .concat([part[0], part[0], part[0], part[0]])
-                            )).flat(3),
-                            outline_normals: poly.map(part => (
-                                part.reduce((arr,coord,i) => {
-                                    const last = part[(part.length + i - 1) % part.length];
-                                    const from_last = [coord[0] - last[0], coord[1] - last[1]];
-                                    const next = part[(i + 1) % part.length];
-                                    const to_next = [next[0] - coord[0], next[1] - coord[1]];
-                                    return arr.concat([
-                                        [from_last[1], -from_last[0]],
-                                        [-from_last[1], from_last[0]],
-                                        [to_next[1], -to_next[0]],
-                                        [-to_next[1], to_next[0]],
-                                    ]);
-                                }, []).concat((() => {
-                                    const coord = part[0]
-                                    const last = part[part.length - 1];
-                                    const from_last = [coord[0] - last[0], coord[1] - last[1]];
-                                    const next = part[1];
-                                    const to_next = [next[0] - coord[0], next[1] - coord[1]];
-                                    return [
-                                        [from_last[1], -from_last[0]],
-                                        [-from_last[1], from_last[0]],
-                                        [to_next[1], -to_next[0]],
-                                        [-to_next[1], to_next[0]],
-                                    ];
-                                })())
-                            )).flat(3),
-                            min: poly.flat().reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
-                            max: poly.flat().reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
-                        }
-                    }),
-                };
+            if (loc) {
+                if (!this.location_data[loc.id]) {
+                    this.location_data[loc.id] = this.generateTriangles(loc);
+                }
             }
         });
+        this.state.min = this.locations.map(l => this.location_data[l.id].min)
+            .reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]);
+        this.state.max = this.locations.map(l => this.location_data[l.id].max)
+            .reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]);
+    }
+
+    render() {
+        this.buildRenderData();
         return html`
             <canvas
                 id="map"
@@ -444,7 +285,15 @@ class MapBackendWebGl extends LitElement {
             </canvas>
         `;
     }
-
 }
 
 customElements.define('map-backend', MapBackendWebGl);
+
+class MapBackendWebGl3d extends MapBackendWebGl {
+    newRenderer() {
+        return new WebGLRenderer3d();
+    }
+}
+
+customElements.define('map-backend-3d', MapBackendWebGl3d);
+
