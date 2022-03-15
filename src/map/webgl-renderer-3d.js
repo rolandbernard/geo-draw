@@ -25,6 +25,9 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         ];
         pos[2] = 1 - pos[0] * pos[0] - pos[1] * pos[1];
         if (pos[2] < 0) {
+            const dist = Math.sqrt(pos[0]*pos[0] + pos[1]*pos[1]);
+            pos[0] /= dist;
+            pos[1] /= dist;
             pos[2] = 0;
         } else {
             pos[2] = Math.sqrt(pos[2]);
