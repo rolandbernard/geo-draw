@@ -60,8 +60,23 @@ export default class WebGLRenderer3d extends WebGLRenderer {
     }
 
     projPosToClientPos(proj_pos, map_pos, state) {
-        const position = this.mat3VecMul(this.generateTransform(state), pos)
-        return [0, 0];
+        const position = [
+            Math.cos(proj_pos[1]) * Math.sin(proj_pos[0]),
+            Math.sin(proj_pos[1]),
+            Math.cos(proj_pos[1]) * Math.cos(proj_pos[0]),
+        ];
+        const pos = this.mat3VecMul(this.generateInverseTransform(state), position)
+        if (pos[2] < 0) {
+            const dist = Math.sqrt(pos[0]*pos[0] + pos[1]*pos[1]);
+            pos[0] /= dist;
+            pos[1] /= dist;
+            pos[2] = 0;
+        }
+        const scale = this.generateScale(state);
+        return [
+            (pos[0] * scale[0] + 1) / 2 * map_pos.width + map_pos.x,
+            (1 - pos[1] * scale[1]) / 2 * map_pos.height + map_pos.y
+        ];
     }
     
     generateScale({size, scale: zoom_scale}) {
@@ -109,6 +124,11 @@ export default class WebGLRenderer3d extends WebGLRenderer {
     generateTransform(state) {
         const { center } = state;
         return this.mat3Mul(this.mat3Rotation(0, center[1]), this.mat3Rotation(1, -center[0]))
+    }
+
+    generateInverseTransform(state) {
+        const { center } = state;
+        return this.mat3Mul(this.mat3Rotation(1, center[0]), this.mat3Rotation(0, -center[1]))
     }
 
     normalizePosition([beta, gamma]) {
