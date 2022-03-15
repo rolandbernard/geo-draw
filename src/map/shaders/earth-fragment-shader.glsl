@@ -55,15 +55,24 @@ vec2 texPosition(vec3 pos) {
     return vec2((lonlat.x + PI) / (2.0 * PI), (lonlat.y + PI / 2.0) / PI);
 }
 
-float computeLight(vec3 pos) {
+float computeLight(vec3 pos, bool water) {
     vec3 light = normalize(vec3(-1.0, 1.0, 3.0));
     float c = max(0.0, dot(light, pos));
     float a = max(0.0, dot(vec3(0.0, 0.0, 1.0), reflect(-light, pos)));
     a *= a;
-    return c * 0.6 + a * 0.3 + 0.1;
+    if (water) {
+        return c * 0.7 + a * 0.1 + 0.2;
+    } else {
+        return c * 0.5 + a * 0.3 + 0.2;
+    }
+}
+
+vec3 waterColor(vec3 pos) {
+    return vec3(0.0, 0.2, 0.4);
 }
 
 void main() {
+    bool water = false;
     vec3 pos = spherePosition();
     float dist = vPixelPos.x * vPixelPos.x + vPixelPos.y * vPixelPos.y;
     float edge = (dist - 1.0) * (dist - 1.0);
@@ -82,17 +91,19 @@ void main() {
             );
             gl_FragColor = texture2D(uSampler, texPos);
         }
+        if (length(gl_FragColor) == 0.0) {
+            gl_FragColor = vec4(waterColor(pos), 1.0);
+            water = true;
+        }
     } else {
         gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0);
     }
-    float f = exp(-5.0e3 * edge);
+    float f = 0.75 * exp(-1.0e4 * edge);
     gl_FragColor = (1.0 - f) * gl_FragColor + f * vec4(0.5, 0.75, 1.0, 1.0);
     if (dist < 1.0) {
-        f = 0.2 * exp(-1.0e2 * edge);
-        gl_FragColor = (1.0 - f) * gl_FragColor + f * vec4(0.0, 0.75, 1.0, 1.0);
-        f = 0.1 * exp(-1.0 * edge);
+        float f = 0.5 * (1.0 - pos.z);
         gl_FragColor = (1.0 - f) * gl_FragColor + f * vec4(0.0, 0.75, 1.0, 1.0);
     }
-    gl_FragColor.xyz = computeLight(pos) * gl_FragColor.xyz;
+    gl_FragColor.xyz = computeLight(pos, water) * gl_FragColor.xyz;
 }
 

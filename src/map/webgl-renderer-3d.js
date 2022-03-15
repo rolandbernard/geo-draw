@@ -282,7 +282,7 @@ export default class WebGLRenderer3d extends WebGLRenderer {
             0.5 / (max[1] - min[1]) / state.scale
         ];
 
-        gl.clearColor(0.0, 0.25, 0.55, 1.0);
+        gl.clearColor(0.0, 0.0, 0.0, 0.0);
         gl.clear(gl.COLOR_BUFFER_BIT);
 
         for (let x = 0; x <= 1; x++) {
