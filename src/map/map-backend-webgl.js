@@ -10,7 +10,6 @@ class MapBackendWebGl extends LitElement {
     static get properties() {
         return {
             locations: { attribute: true },
-            render3d: { type: Boolean }
         }
     }
 
