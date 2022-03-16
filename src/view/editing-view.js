@@ -74,8 +74,8 @@ class EditingView extends LitElement {
             }
             .link {
                 position: absolute;
-                bottom: 0.5rem;
-                left: 0.5rem;
+                top: 0.5rem;
+                right: 0.5rem;
                 fill: var(--primary);
                 width: 1.75rem;
                 height: 1.75rem;
