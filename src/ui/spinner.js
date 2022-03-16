@@ -1,5 +1,5 @@
 
-import { css, html, LitElement, unsafeCSS } from 'lit-element'
+import { css, html, LitElement, unsafeCSS } from 'lit'
 
 const NUM_ELEM = 10;
 

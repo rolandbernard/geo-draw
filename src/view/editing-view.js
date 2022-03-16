@@ -1,6 +1,6 @@
 
-import { css, html, LitElement } from 'lit-element'
-import { unsafeHTML } from 'lit-html/directives/unsafe-html';
+import { css, html, LitElement } from 'lit'
+import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 
 import '../map/map-renderer';
 import '../ui/map-data-input';
@@ -74,8 +74,8 @@ class EditingView extends LitElement {
             }
             .link {
                 position: absolute;
-                bottom: 0.5rem;
-                left: 0.5rem;
+                top: 0.5rem;
+                right: 0.5rem;
                 fill: var(--primary);
                 width: 1.75rem;
                 height: 1.75rem;

@@ -2,27 +2,25 @@ const webpack = require('webpack');
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
-const CleanWebpackPlugin = require('clean-webpack-plugin');
+const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const CreateFileWebpack = require('create-file-webpack');
+const { GenerateSW } = require('workbox-webpack-plugin');
 
 const webcomponentsjs = './node_modules/@webcomponents/webcomponentsjs';
 
 const polyfills = [
     {
         from: path.resolve(`${webcomponentsjs}/webcomponents-*.{js,map}`),
-        to: 'vendor',
-        flatten: true
+        to: 'vendor/[name][ext]',
     },
     {
         from: path.resolve(`${webcomponentsjs}/bundles/*.{js,map}`),
-        to: 'vendor/bundles',
-        flatten: true
+        to: 'vendor/bundles/[name][ext]',
     },
     {
         from: path.resolve(`${webcomponentsjs}/custom-elements-es5-adapter.js`),
-        to: 'vendor',
-        flatten: true
+        to: 'vendor/[name][ext]',
     },
 ];
 
@@ -34,7 +32,7 @@ const assets = [
 ];
 
 const plugins = [
-    new CleanWebpackPlugin(['dist']),
+    new CleanWebpackPlugin(),
     new webpack.ProgressPlugin(),
     new HtmlWebpackPlugin({
         filename: 'index.html',
@@ -45,14 +43,33 @@ const plugins = [
             minifyJS: true
         }
     }),
-    new CopyWebpackPlugin([...polyfills, ...assets], {
-        ignore: ['.DS_Store']
+    new CopyWebpackPlugin({
+        patterns: [...polyfills, ...assets],
     }),
     new MiniCssExtractPlugin(),
     new CreateFileWebpack({ path: 'dist', fileName: '.nojekyll', content: '' }),
+    new GenerateSW({
+        exclude: [/\.(json|bin)$/, /vendor.*bundle/],
+        cleanupOutdatedCaches: true,
+        runtimeCaching: [
+            {
+                urlPattern: /vendor.*bundle/,
+                handler: 'CacheFirst',
+            },
+            {
+                urlPattern: /\.bin$/,
+                handler: 'CacheFirst',
+            },
+            {
+                urlPattern: /\.json$/,
+                handler: 'NetworkFirst',
+            }
+        ],
+    })
 ];
 
 module.exports = {
+    devtool: 'inline-source-map',
     entry: './src/index.js',
     output: {
         filename: '[name].[chunkhash:8].js',

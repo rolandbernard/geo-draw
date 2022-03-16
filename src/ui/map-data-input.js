@@ -1,13 +1,13 @@
 
-import { css, html, LitElement } from 'lit-element'
-import { until } from 'lit-html/directives/until';
-import { unsafeHTML } from 'lit-html/directives/unsafe-html';
+import { css, html, LitElement } from 'lit'
+import { until } from 'lit/directives/until.js';
+import { unsafeHTML } from 'lit/directives/unsafe-html.js';
+import { classMap } from 'lit/directives/class-map.js';
 
 import './spinner';
 import './location-input';
 import AddIcon from '../icons/add.svg';
 import DeleteIcon from '../icons/delete.svg';
-import { classMap } from 'lit-html/directives/class-map';
 
 const data_location = './static/data/';
 
@@ -117,17 +117,17 @@ class MapDataInput extends LitElement {
                 display: block;
                 margin: 4px;
             }
-            .title-input-wrap, .defcolor-input-wrap, .data-input-wrap, .location-cell {
+            .title-input-wrap, .defcolor-input-wrap, .a3d-input-wrap, .data-input-wrap, .location-cell {
                 display: flex;
                 align-items: center;
             }
-            .title-input-wrap, .defcolor-input-wrap {
+            .title-input-wrap, .defcolor-input-wrap, .a3d-input-wrap {
                 margin: 0.25rem;
             }
             .title-input-wrap {
                 margin-top: 0.5rem;
             }
-            .title-input-wrap span.title, .defcolor-input-wrap span.defcolor {
+            .title-input-wrap span.title, .defcolor-input-wrap span.defcolor, .a3d-input-wrap span.a3d {
                 margin: 4px;
             }
             input.text-field, input.text-field {
@@ -141,6 +141,18 @@ class MapDataInput extends LitElement {
                 font-family: Roboto, sans-serif;
                 font-size: 0.9rem;
                 color: black;
+            }
+            .input-wrap {
+                display: flex;
+                flex-flow: row nowrap;
+                justify-content: space-between;
+                max-width: 20rem;
+            }
+            .a3d-input-wrap span.a3d {
+                white-space: nowrap;
+            }
+            .a3d-input-wrap .a3d-checkbox {
+                min-width: 2rem;
             }
         `;
     }
@@ -302,6 +314,13 @@ class MapDataInput extends LitElement {
         });
     }
 
+    updateAllow3d(allow_3d) {
+        this.data.allow_3d = allow_3d;
+        this.dispatchOnChange({
+            ...this.data,
+        });
+    }
+
     render() {
         return html`
             <div class="map-input-root">
@@ -314,12 +333,20 @@ class MapDataInput extends LitElement {
                                 value="${this.data.title}"
                                 @change="${e => this.updateTitle(e.target.value)}"
                             /></span>
-                            <span class="defcolor-input-wrap"><span class="defcolor">Default color:</span><input
-                                class="color-input"
-                                type="color"
-                                value="${this.data.defcolor}"
-                                @change="${e => this.updateDefaultColor(e.target.value)}"
-                            /></span>
+                            <span class="input-wrap">
+                                <span class="defcolor-input-wrap"><span class="defcolor">Default color:</span><input
+                                    class="color-input"
+                                    type="color"
+                                    value="${this.data.defcolor}"
+                                    @change="${e => this.updateDefaultColor(e.target.value)}"
+                                /></span>
+                                <span class="a3d-input-wrap"><span class="a3d">Allow 3D:</span><input
+                                    class="a3d-checkbox"
+                                    type="checkbox"
+                                    ?checked="${this.data.allow_3d}"
+                                    @change="${e => this.updateAllow3d(e.target.checked)}"
+                                /></span>
+                            </span>
                         </div>
                         <table>
                             <tr><td class="header"><span class="location-header">Locations</span></td>${this.data.columns.map((col, i) => (html`

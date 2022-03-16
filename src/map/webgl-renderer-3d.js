@@ -16,7 +16,7 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         // This is a noop
     }
 
-    clientPosToSomePos(client_pos, map_pos, state) {
+    clientPosToSpherePos(client_pos, map_pos, state) {
         const scale = this.generateScale(state);
         const pos = [
             (2 * (client_pos[0] - map_pos.x) / map_pos.width - 1.0) / scale[0],
@@ -32,6 +32,11 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         } else {
             pos[2] = Math.sqrt(pos[2]);
         }
+        return pos;
+    }
+
+    clientPosToSomePos(client_pos, map_pos, state) {
+        const pos = this.clientPosToSpherePos(client_pos, map_pos, state)
         const position = this.mat3VecMul(this.generateTransform(state), pos)
         const coord = [
             Math.atan2(position[0], position[2]),
@@ -40,22 +45,22 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         return coord;
     }
 
+    normalizeAround(x, a) {
+        if (x < a - Math.PI) {
+            return x + 2 * Math.PI * Math.floor((a + Math.PI - x) / (2 * Math.PI));
+        } else if (x > a + Math.PI) {
+            return x - 2 * Math.PI * Math.floor((x + Math.PI - a) / (2 * Math.PI));
+        } else {
+            return x;
+        }
+    }
+
     clientPosToMapPos(client_pos, map_pos, state) {
         const { center } = state;
+        const pos = this.clientPosToSpherePos(client_pos, map_pos, state)
+        const coord = center[1] + Math.atan2(pos[1], Math.sqrt(pos[0] * pos[0] + pos[2] * pos[2]));
         const proj = this.clientPosToSomePos(client_pos, map_pos, state);
-        while (proj[0] < center[0] - Math.PI) {
-            proj[0] += 2 * Math.PI;
-        }
-        while (proj[0] > center[0] + Math.PI) {
-            proj[0] -= 2 * Math.PI;
-        }
-        while (proj[1] < center[1] - Math.PI) {
-            proj[1] += 2 * Math.PI;
-        }
-        while (proj[1] > center[1] + Math.PI) {
-            proj[1] -= 2 * Math.PI;
-        }
-        return proj;
+        return [this.normalizeAround(proj[0], center[0]), coord];
     }
 
     clientPosToProjPos(client_pos, map_pos, state) {

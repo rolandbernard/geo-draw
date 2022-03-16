@@ -1,5 +1,5 @@
 
-import { LitElement, html, css } from 'lit-element';
+import { LitElement, html, css } from 'lit';
 import earcut from 'earcut';
 
 import WebGLRenderer from './webgl-renderer';
@@ -10,7 +10,6 @@ class MapBackendWebGl extends LitElement {
     static get properties() {
         return {
             locations: { attribute: true },
-            render3d: { type: Boolean }
         }
     }
 
