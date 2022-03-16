@@ -5,6 +5,7 @@ const CopyWebpackPlugin = require('copy-webpack-plugin');
 const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const CreateFileWebpack = require('create-file-webpack');
+const { GenerateSW } = require('workbox-webpack-plugin');
 
 const webcomponentsjs = './node_modules/@webcomponents/webcomponentsjs';
 
@@ -47,14 +48,29 @@ const plugins = [
     }),
     new MiniCssExtractPlugin(),
     new CreateFileWebpack({ path: 'dist', fileName: '.nojekyll', content: '' }),
+    new GenerateSW({
+        exclude: [/\.(json|bin)$/, /vendor.*bundle/],
+        cleanupOutdatedCaches: true,
+        runtimeCaching: [
+            {
+                urlPattern: /vendor.*bundle/,
+                handler: 'CacheFirst',
+            },
+            {
+                urlPattern: /\.bin$/,
+                handler: 'CacheFirst',
+            },
+            {
+                urlPattern: /\.json$/,
+                handler: 'NetworkFirst',
+            }
+        ],
+    })
 ];
 
 module.exports = {
     devtool: 'inline-source-map',
-    entry: {
-        'app':  './src/index.js',
-        'service-worker': { import: './src/service-worker.js', filename: 'serviceWorker.js' },
-    },
+    entry: './src/index.js',
     output: {
         filename: '[name].[chunkhash:8].js',
         path: path.resolve(__dirname, "dist"),

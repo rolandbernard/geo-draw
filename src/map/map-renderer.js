@@ -1,8 +1,8 @@
 
-import { LitElement, html, css } from 'lit-element';
-import { styleMap } from 'lit-html/directives/style-map.js';
-import { until } from 'lit-html/directives/until.js';
-import { cache } from 'lit-html/directives/cache.js';
+import { LitElement, html, css } from 'lit';
+import { styleMap } from 'lit/directives/style-map.js';
+import { until } from 'lit/directives/until.js';
+import { cache } from 'lit/directives/cache.js';
 
 import '../ui/spinner';
 import { map as mapFromTo, hasWebGlSupport } from '../util';
@@ -13,7 +13,7 @@ if (hasWebGlSupport()) {
     import(/* webpackChunkName: "map-backend-svg" */ './map-backend-svg');
 }
 
-const data_location = './static/data/';
+const data_location = './static/data';
 const location_cache = {};
 
 const MIN_ZOOM = 0.5;

@@ -1,5 +1,5 @@
 
-import { render } from 'lit-html';
+import { render } from 'lit';
 
 export class Router {
     

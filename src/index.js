@@ -1,9 +1,15 @@
 
-import { html } from 'lit-element';
+import { html } from 'lit';
 import 'typeface-roboto';
 
 import { Router } from './router';
 import './index.css';
+
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js');
+    });
+}
 
 window.addEventListener('load', () => {
     const main = document.querySelector('main');

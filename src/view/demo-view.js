@@ -1,11 +1,11 @@
 
-import { css, html, LitElement } from 'lit-element'
-import { until } from 'lit-html/directives/until.js';
+import { css, html, LitElement } from 'lit'
+import { until } from 'lit/directives/until.js';
 
 import '../map/map-renderer';
 import '../ui/spinner';
 
-const demo_location = './static/demo/';
+const demo_location = './static/demo';
 
 class DemoView extends LitElement {
 
