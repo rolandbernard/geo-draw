@@ -1,13 +1,13 @@
 
 import { css, html, LitElement } from 'lit-element'
-import { until } from 'lit-html/directives/until';
-import { unsafeHTML } from 'lit-html/directives/unsafe-html';
+import { until } from 'lit-html/directives/until.js';
+import { unsafeHTML } from 'lit-html/directives/unsafe-html.js';
+import { classMap } from 'lit-html/directives/class-map.js';
 
 import './spinner';
 import './location-input';
 import AddIcon from '../icons/add.svg';
 import DeleteIcon from '../icons/delete.svg';
-import { classMap } from 'lit-html/directives/class-map';
 
 const data_location = './static/data/';
 

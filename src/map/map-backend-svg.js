@@ -1,6 +1,6 @@
 
 import { LitElement, html, svg, css } from 'lit-element';
-import { styleMap } from 'lit-html/directives/style-map';
+import { styleMap } from 'lit-html/directives/style-map.js';
 
 import { map } from '../util';
 import MapRenderer from './map-renderer';

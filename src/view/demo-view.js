@@ -1,6 +1,6 @@
 
 import { css, html, LitElement } from 'lit-element'
-import { until } from 'lit-html/directives/until';
+import { until } from 'lit-html/directives/until.js';
 
 import '../map/map-renderer';
 import '../ui/spinner';

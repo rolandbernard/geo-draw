@@ -1,6 +1,5 @@
 
 import { css, html, LitElement } from 'lit-element'
-import { until } from 'lit-html/directives/until';
 
 import '../map/map-renderer';
 

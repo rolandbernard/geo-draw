@@ -1,8 +1,8 @@
 
 import { LitElement, html, css } from 'lit-element';
-import { styleMap } from 'lit-html/directives/style-map';
-import { until } from 'lit-html/directives/until';
-import { cache } from 'lit-html/directives/cache';
+import { styleMap } from 'lit-html/directives/style-map.js';
+import { until } from 'lit-html/directives/until.js';
+import { cache } from 'lit-html/directives/cache.js';
 
 import '../ui/spinner';
 import { map as mapFromTo, hasWebGlSupport } from '../util';

@@ -2,7 +2,7 @@ const webpack = require('webpack');
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
-const CleanWebpackPlugin = require('clean-webpack-plugin');
+const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const CreateFileWebpack = require('create-file-webpack');
 
@@ -11,18 +11,15 @@ const webcomponentsjs = './node_modules/@webcomponents/webcomponentsjs';
 const polyfills = [
     {
         from: path.resolve(`${webcomponentsjs}/webcomponents-*.{js,map}`),
-        to: 'vendor',
-        flatten: true
+        to: 'vendor/[name][ext]',
     },
     {
         from: path.resolve(`${webcomponentsjs}/bundles/*.{js,map}`),
-        to: 'vendor/bundles',
-        flatten: true
+        to: 'vendor/bundles/[name][ext]',
     },
     {
         from: path.resolve(`${webcomponentsjs}/custom-elements-es5-adapter.js`),
-        to: 'vendor',
-        flatten: true
+        to: 'vendor/[name][ext]',
     },
 ];
 
@@ -34,7 +31,7 @@ const assets = [
 ];
 
 const plugins = [
-    new CleanWebpackPlugin(['dist']),
+    new CleanWebpackPlugin(),
     new webpack.ProgressPlugin(),
     new HtmlWebpackPlugin({
         filename: 'index.html',
@@ -45,15 +42,19 @@ const plugins = [
             minifyJS: true
         }
     }),
-    new CopyWebpackPlugin([...polyfills, ...assets], {
-        ignore: ['.DS_Store']
+    new CopyWebpackPlugin({
+        patterns: [...polyfills, ...assets],
     }),
     new MiniCssExtractPlugin(),
     new CreateFileWebpack({ path: 'dist', fileName: '.nojekyll', content: '' }),
 ];
 
 module.exports = {
-    entry: './src/index.js',
+    devtool: 'inline-source-map',
+    entry: {
+        'app':  './src/index.js',
+        'service-worker': { import: './src/service-worker.js', filename: 'serviceWorker.js' },
+    },
     output: {
         filename: '[name].[chunkhash:8].js',
         path: path.resolve(__dirname, "dist"),
