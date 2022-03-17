@@ -7,6 +7,10 @@ import { cache } from 'lit/directives/cache.js';
 import '../ui/spinner';
 import { map as mapFromTo, hasWebGlSupport } from '../util';
 
+import { run } from '../../pkg/index';
+
+run();
+
 if (hasWebGlSupport()) {
     import(/* webpackChunkName: "map-backend-webgl" */ './map-backend-webgl');
 } else {

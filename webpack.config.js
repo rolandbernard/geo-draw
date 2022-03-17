@@ -6,7 +6,9 @@ const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const CreateFileWebpack = require('create-file-webpack');
 const { GenerateSW } = require('workbox-webpack-plugin');
+const WasmPackPlugin = require("@wasm-tool/wasm-pack-plugin");
 
+const isDevMode = !process.env.production;
 const webcomponentsjs = './node_modules/@webcomponents/webcomponentsjs';
 
 const polyfills = [
@@ -32,8 +34,11 @@ const assets = [
 ];
 
 const plugins = [
-    new CleanWebpackPlugin(),
     new webpack.ProgressPlugin(),
+    new webpack.DefinePlugin({
+        'isProduction': !isDevMode,
+    }),
+    new CleanWebpackPlugin(),
     new HtmlWebpackPlugin({
         filename: 'index.html',
         template: './src/index.html',
@@ -46,34 +51,51 @@ const plugins = [
     new CopyWebpackPlugin({
         patterns: [...polyfills, ...assets],
     }),
+    new WasmPackPlugin({
+       crateDirectory: __dirname,
+    }),
     new MiniCssExtractPlugin(),
     new CreateFileWebpack({ path: 'dist', fileName: '.nojekyll', content: '' }),
-    new GenerateSW({
-        exclude: [/\.(json|bin)$/, /vendor.*bundle/],
-        cleanupOutdatedCaches: true,
-        runtimeCaching: [
-            {
-                urlPattern: /vendor.*bundle/,
-                handler: 'CacheFirst',
-            },
-            {
-                urlPattern: /\.bin$/,
-                handler: 'CacheFirst',
-            },
-            {
-                urlPattern: /\.json$/,
-                handler: 'NetworkFirst',
-            }
-        ],
-    })
 ];
 
+if (!isDevMode) {
+    plugins.push(
+        new GenerateSW({
+            exclude: [/\.(json|bin)$/, /vendor.*bundle/],
+            cleanupOutdatedCaches: true,
+            runtimeCaching: [
+                {
+                    urlPattern: /vendor.*bundle/,
+                    handler: 'CacheFirst',
+                },
+                {
+                    urlPattern: /\.bin$/,
+                    handler: 'CacheFirst',
+                },
+                {
+                    urlPattern: /\.json$/,
+                    handler: 'NetworkFirst',
+                }
+            ],
+        }),
+    )
+}
+
 module.exports = {
+    mode: isDevMode ? 'development' : 'production',
     devtool: 'inline-source-map',
     entry: './src/index.js',
     output: {
         filename: '[name].[chunkhash:8].js',
         path: path.resolve(__dirname, "dist"),
+    },
+    experiments: {
+        asyncWebAssembly: true,
+    },
+    devServer: {
+        hot: true,
+        compress: true,
+        host: '0.0.0.0',
     },
     module: {
         rules: [
