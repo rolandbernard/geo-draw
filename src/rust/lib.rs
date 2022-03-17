@@ -1,10 +1,11 @@
 
 use wasm_bindgen::prelude::*;
-use web_sys::console;
+// use web_sys::console;
+
+mod earcut;
 
 #[wasm_bindgen]
-pub fn run() -> Result<(), JsValue> {
-    console::log_1(&JsValue::from_str("Hello world!"));
-    Ok(())
+pub fn sum(a: i32, b: i32) -> i32 {
+    return a + b;
 }
 

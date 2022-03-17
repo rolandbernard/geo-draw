@@ -213,26 +213,12 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         const earth_texmax_uniform = gl.getUniformLocation(earth_shader_program, 'uTexMax');
         const earth_transform_uniform = gl.getUniformLocation(earth_shader_program, 'uTransform');
 
-        const earth_vertices = new Float32Array(8);
-        {
-            earth_vertices[0] = -2;
-            earth_vertices[1] = 2;
-            earth_vertices[2] = 2;
-            earth_vertices[3] = 2;
-            earth_vertices[4] = 2;
-            earth_vertices[5] = -2;
-            earth_vertices[6] = -2;
-            earth_vertices[7] = -2;
-        }
-        const earth_triangles = new Uint16Array(6);
-        {
-            earth_triangles[0] = 0;
-            earth_triangles[1] = 1;
-            earth_triangles[2] = 2;
-            earth_triangles[3] = 2;
-            earth_triangles[4] = 3;
-            earth_triangles[5] = 0;
-        }
+        const earth_vertices = new Float32Array([
+            -2, 2,   2, 2,   2, -2,   -2, -2,
+        ]);
+        const earth_triangles = new Uint16Array([
+            0, 1, 2,   2, 3, 0,
+        ]);
         const earth_position_buffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, earth_position_buffer);
         gl.bufferData(gl.ARRAY_BUFFER, earth_vertices, gl.STATIC_DRAW);

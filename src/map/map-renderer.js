@@ -7,9 +7,9 @@ import { cache } from 'lit/directives/cache.js';
 import '../ui/spinner';
 import { map as mapFromTo, hasWebGlSupport } from '../util';
 
-import { run } from '../../pkg/index';
+import { sum } from '../../pkg/index';
 
-run();
+console.log(sum(1, 20))
 
 if (hasWebGlSupport()) {
     import(/* webpackChunkName: "map-backend-webgl" */ './map-backend-webgl');
