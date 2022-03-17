@@ -155,7 +155,7 @@ class EditingView extends LitElement {
                     <div class="editing">
                         <map-data-input
                             .data="${this.data}"
-                            @change="${this.onUpdate})"
+                            @change="${this.onUpdate}"
                         ></map-data-input>
                     </div>
                     <div class="renderer">
