@@ -282,7 +282,7 @@ export default class MapRenderer extends LitElement {
             if (event.location && event.position) {
                 const name = this.shadowRoot.getElementById('info-box-name');
                 const map_wrapper = this.shadowRoot.getElementById('map-wrapper');
-                name.innerText = event.location.geo.name.split(',')[0];
+                name.innerText = event.location.name.split(',')[0];
                 Array.from(info_box.getElementsByClassName('info-field-value')).forEach((el, i) => {
                     el.innerText = (Math.round(event.location.data[i] * 100) / 100).toLocaleString();
                 });
@@ -503,7 +503,13 @@ export default class MapRenderer extends LitElement {
                 }
                 const locations = locations_data
                     .filter(loc => loc)
-                    .map((loc, i) => ({ geo: loc, color: colors[i], data: data.data[i], columns: data.columns }));
+                    .map((loc, i) => ({
+                        name: loc.name,
+                        raw: loc,
+                        color: colors[i],
+                        data: data.data[i],
+                        columns: data.columns,
+                    }));
                 if (locations.length == 0) {
                     throw 'No data';
                 }

@@ -145,27 +145,38 @@ class MapBackendSvg extends LitElement {
                     last = coords;
                 }
             }
-            if (i == 0) {
-                res.push(...sub);
-            } else {
-                res.push(...sub.reverse());
-            }
-            res.push(' z');
+            res.push(...sub);
+            res.push(' z ');
         }
         return res.join('');
     }
 
     render() {
-        const min = this.locations.filter(loc => loc).map(loc => loc.geo.proj_min)
+        this.locations.forEach(loc => {
+            if (loc && (!loc.proj_min || !loc.proj_max)) {
+                loc.proj_min = loc.raw.proj_min;
+                loc.proj_max = loc.raw.proj_max;
+            }
+        })
+        const min = this.locations.filter(loc => loc).map(loc => loc.proj_min)
                 .reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]);
-        const max = this.locations.filter(loc => loc).map(loc => loc.geo.proj_max)
+        const max = this.locations.filter(loc => loc).map(loc => loc.proj_max)
                 .reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]);
         const total_diff = Math.max(max[0] - min[0], max[1] - min[1]);
         const max_size = Math.max(window.innerWidth, window.innerHeight) * 5;
         this.locations.forEach(loc => {
             if(loc) {
-                const polygons = [...Array(loc.geo.count_polygons()).keys()].map(i => loc.geo.get_proj_polygon(i))
-                loc.svg = polygons.map(poly => (
+                if (!loc.proj_polygons) {
+                    loc.proj_polygons = [...Array(loc.raw.count_polygons()).keys()]
+                        .map(i => loc.raw.get_proj_polygon(i))
+                        .map(poly => ({
+                            vertex: poly.vertex,
+                            holes: poly.holes,
+                            min: poly.min,
+                            max: poly.max
+                        }));
+                }
+                loc.svg = loc.proj_polygons.map(poly => (
                     svg`<path d="${this.svgPathForPolygon(poly, min, total_diff, max_size)}"/>`
                 ));
             }
