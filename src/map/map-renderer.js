@@ -9,7 +9,7 @@ import { map as mapFromTo, hasWebGlSupport } from '../util';
 
 import { LocationData } from '../../pkg/index';
 
-if (hasWebGlSupport()) {
+if (false && hasWebGlSupport()) {
     import(/* webpackChunkName: "map-backend-webgl" */ './map-backend-webgl');
 } else {
     import(/* webpackChunkName: "map-backend-svg" */ './map-backend-svg');
@@ -252,26 +252,6 @@ export default class MapRenderer extends LitElement {
         this.details = true;
     }
 
-    static project([lon, lat]) {
-        return [
-            Math.PI + lon,
-            ((() => {
-                if (Math.abs(lat) > 85) {
-                    lat = Math.sign(lat) * 85;
-                }
-                const phi = lat;
-                return Math.PI - Math.log(Math.tan(Math.PI / 4 + phi / 2));
-            })())
-        ];
-    }
-
-    static to_radians([lon, lat]) {
-        return [
-            lon * Math.PI / 180,
-            lat * Math.PI / 180,
-        ];
-    }
-
     static parseColor(str) {
         const match = str.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
         if (match) {
@@ -302,7 +282,7 @@ export default class MapRenderer extends LitElement {
             if (event.location && event.position) {
                 const name = this.shadowRoot.getElementById('info-box-name');
                 const map_wrapper = this.shadowRoot.getElementById('map-wrapper');
-                name.innerText = event.location.name.split(',')[0];
+                name.innerText = event.location.geo.name.split(',')[0];
                 Array.from(info_box.getElementsByClassName('info-field-value')).forEach((el, i) => {
                     el.innerText = (Math.round(event.location.data[i] * 100) / 100).toLocaleString();
                 });
@@ -466,12 +446,10 @@ export default class MapRenderer extends LitElement {
                         if (res.ok) {
                             const uint8_array = new Uint8Array(await res.arrayBuffer());
                             location_cache[location] = LocationData.parse_location_data(uint8_array);
-                            console.log(location_cache[location]);
                         } else {
                             location_cache[location] = null;
                         }
                     } catch (e) {
-                        console.log(e)
                         return null;
                     }
                 }
@@ -524,8 +502,8 @@ export default class MapRenderer extends LitElement {
                     colors = data.locations.map(() => defcolor);
                 }
                 const locations = locations_data
-                    .map((loc, i) => loc ? { ...loc, color: colors[i], data: data.data[i], columns: data.columns } : null)
-                    .filter(loc => loc);
+                    .filter(loc => loc)
+                    .map((loc, i) => ({ geo: loc, color: colors[i], data: data.data[i], columns: data.columns }));
                 if (locations.length == 0) {
                     throw 'No data';
                 }
