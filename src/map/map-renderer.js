@@ -7,9 +7,7 @@ import { cache } from 'lit/directives/cache.js';
 import '../ui/spinner';
 import { map as mapFromTo, hasWebGlSupport } from '../util';
 
-import { sum } from '../../pkg/index';
-
-console.log(sum(1, 20))
+import { LocationData } from '../../pkg/index';
 
 if (hasWebGlSupport()) {
     import(/* webpackChunkName: "map-backend-webgl" */ './map-backend-webgl');
@@ -254,42 +252,6 @@ export default class MapRenderer extends LitElement {
         this.details = true;
     }
 
-    static parseBinaryData(array_buffer) {
-        const uint8_array = new Uint8Array(array_buffer);
-        let len = 0;
-        while (uint8_array[len] != 0) {
-            len++;
-        }
-        const string_part = new Uint8Array(array_buffer, 0, len);
-        const utf8_decoder = new TextDecoder();
-        const data_view = new DataView(array_buffer, len + 1);
-        len = 0;
-        const coords = [];
-        const num_poly = data_view.getUint32(len, true);
-        len += 4;
-        for (let p = 0; p < num_poly; p++) {
-            coords.push([]);
-            const num_path = data_view.getUint32(len, true);
-            len += 4;
-            for (let t = 0; t < num_path; t++) {
-                coords[p].push([]);
-                const num_cords = data_view.getUint32(len, true);
-                len += 4;
-                for (let c = 0; c < num_cords; c++) {
-                    const lon = data_view.getInt32(len, true);
-                    len += 4;
-                    const lat = data_view.getInt32(len, true);
-                    len += 4;
-                    coords[p][t].push([lon, lat]);
-                }
-            }
-        }
-        return {
-            name: utf8_decoder.decode(string_part),
-            coords: coords,
-        };
-    }
-
     static project([lon, lat]) {
         return [
             Math.PI + lon,
@@ -502,22 +464,14 @@ export default class MapRenderer extends LitElement {
                     try {
                         const res = await fetch(`${data_location}/${location}.bin`);
                         if (res.ok) {
-                            const data = MapRenderer.parseBinaryData(await res.arrayBuffer());
-                            const coords = data.coords.map(poly => poly.map(part => (
-                                part.map(([lon, lat]) => MapRenderer.to_radians([lon / 1e7, lat / 1e7]))
-                            )));
-                            location_cache[location] = {
-                                id: location,
-                                name: data.name,
-                                coords: coords,
-                                min: coords.flat(2).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
-                                max: coords.flat(2).reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
-                                raw_coords: data.coords,
-                            };
+                            const uint8_array = new Uint8Array(await res.arrayBuffer());
+                            location_cache[location] = LocationData.parse_location_data(uint8_array);
+                            console.log(location_cache[location]);
                         } else {
                             location_cache[location] = null;
                         }
                     } catch (e) {
+                        console.log(e)
                         return null;
                     }
                 }
