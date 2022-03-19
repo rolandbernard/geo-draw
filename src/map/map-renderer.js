@@ -9,7 +9,7 @@ import { map as mapFromTo, hasWebGlSupport } from '../util';
 
 import { LocationData } from '../../pkg/index';
 
-if (false && hasWebGlSupport()) {
+if (hasWebGlSupport()) {
     import(/* webpackChunkName: "map-backend-webgl" */ './map-backend-webgl');
 } else {
     import(/* webpackChunkName: "map-backend-svg" */ './map-backend-svg');

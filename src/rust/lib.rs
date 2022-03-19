@@ -4,6 +4,7 @@ use std::f64::consts::PI;
 use wasm_bindgen::prelude::*;
 
 mod earcut;
+mod list;
 
 type Point = [f64; 2];
 
@@ -37,6 +38,11 @@ impl Polygon {
     pub fn max(&self) -> Vec<f64> {
         self.min.to_vec()
     }
+
+    // #[wasm_bindgen]
+    // pub fn triangulate(&self) -> Vec<usize> {
+    //     earcut::triangulate(&self.vertex, &self.holes)
+    // }
 
     fn projected(&self) -> Polygon {
         fn map_projection(lon: f64, lat: f64) -> Point {
