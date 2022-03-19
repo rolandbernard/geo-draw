@@ -314,9 +314,9 @@ export default class WebGLRenderer3d extends WebGLRenderer {
                     gl.uniform2fv(fill_data.translate_uniform, translate);
                     gl.uniform2fv(fill_data.scale_uniform, scale);
                     if (loc.id === state.hover) {
-                        gl.uniform3fv(fill_data.color_uniform, loc.color.map(el => el * 0.8));
+                        gl.uniform3fv(fill_data.color_uniform, loc.color.map(el => el / 255 * 0.8));
                     } else {
-                        gl.uniform3fv(fill_data.color_uniform, loc.color);
+                        gl.uniform3fv(fill_data.color_uniform, loc.color.map(el => el / 255));
                     }
                     gl.bindBuffer(gl.ARRAY_BUFFER, triangles.gl_position_buffer);
                     gl.vertexAttribPointer(fill_data.position_attribute, 2, gl.FLOAT, false, 0, 0);

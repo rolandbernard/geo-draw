@@ -257,7 +257,7 @@ class MapBackendWebGl extends LitElement {
 
     buildRenderData() {
         this.locations.forEach(loc => {
-            loc.color = loc.color.map(el => el / 255);
+            console.log(loc);
             if (loc) {
                 if (!this.location_data[loc.id]) {
                     this.location_data[loc.id] = this.generateTriangles(loc);

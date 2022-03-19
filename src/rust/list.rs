@@ -21,17 +21,18 @@ impl<T> CircularList<T> {
     }
 
     pub fn rotate(&mut self, off: isize) {
-        assert!(self.count > 0);
-        for _ in 0..off.abs() {
-            if off >= 0 {
-                self.first = self.next[self.first];
-            } else {
-                self.first = self.prev[self.first];
+        if self.count > 0 {
+            for _ in 0..off.abs() {
+                if off >= 0 {
+                    self.first = self.next[self.first];
+                } else {
+                    self.first = self.prev[self.first];
+                }
             }
         }
     }
 
-    pub fn get(&self, off: isize) -> &T {
+    fn get_index(&self, off: isize) -> usize {
         assert!(self.count > 0);
         let mut idx = self.first;
         for _ in 0..off.abs() {
@@ -41,7 +42,17 @@ impl<T> CircularList<T> {
                 idx = self.prev[idx];
             }
         }
+        idx
+    }
+
+    pub fn get(&self, off: isize) -> &T {
+        let idx = self.get_index(off);
         &self.data[idx]
+    }
+
+    pub fn get_mut(&mut self, off: isize) -> &mut T {
+        let idx = self.get_index(off);
+        &mut self.data[idx]
     }
 
     pub fn insert(&mut self, val: T) {
@@ -80,7 +91,11 @@ impl<T> CircularList<T> {
 
     pub fn len(&self) -> usize {
         self.count
-    } 
+    }
+
+    pub fn get_view<'a>(&'a self) -> CircularListView<'a, T> {
+        CircularListView { list: self, at: self.first }
+    }
 }
 
 impl<'a, T> IntoIterator for &'a CircularList<T> {
@@ -110,6 +125,47 @@ impl<'a, T> Iterator for CircularListIterator<'a, T> {
             self.at = self.list.next[self.at];
             Some(res)
         }
+    }
+}
+
+pub struct CircularListView<'a, T> {
+    list: &'a CircularList<T>,
+    at: usize,
+}
+
+impl<'a, T> CircularListView<'a, T> {
+    pub fn rotate(&mut self, off: isize) {
+        if self.list.count > 0 {
+            for _ in 0..off.abs() {
+                if off >= 0 {
+                    self.at = self.list.next[self.at];
+                } else {
+                    self.at = self.list.prev[self.at];
+                }
+            }
+        }
+    }
+
+    fn get_index(&self, off: isize) -> usize {
+        assert!(self.list.count > 0);
+        let mut idx = self.at;
+        for _ in 0..off.abs() {
+            if off >= 0 {
+                idx = self.list.next[idx];
+            } else {
+                idx = self.list.prev[idx];
+            }
+        }
+        idx
+    }
+
+    pub fn get(&self, off: isize) -> &T {
+        let idx = self.get_index(off);
+        &self.list.data[idx]
+    }
+
+    pub fn len(&self) -> usize {
+        self.list.count
     }
 }
 
