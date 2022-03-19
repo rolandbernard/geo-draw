@@ -1,9 +1,6 @@
 
 use crate::list::CircularList;
 
-use wasm_bindgen::JsValue;
-use web_sys::console;
-
 struct Node {
     x: f64, y: f64,
     z: f64, st: bool,
@@ -16,24 +13,19 @@ impl PartialEq for Node {
 }
 
 pub fn triangulate(vertex: &[f64], holes: &[usize], min: [f64; 2], max: [f64; 2]) -> Vec<usize> {
-    console::log_1(&JsValue::from("test1"));
     let mut nodes = Vec::new();
     for i in 0..vertex.len() / 2 {
         nodes.push(Node { x: vertex[2*i], y: vertex[2*i + 1], z: f64::NAN, st: false });
     }
-    console::log_1(&JsValue::from("test2"));
     let outer_len = if holes.len() > 0 { holes[0] } else { vertex.len() / 2 };
     let mut outer_nodes = create_list(&nodes, 0, outer_len, false);
     let mut triangles = Vec::new();
-    console::log_1(&JsValue::from("test3"));
     if holes.len() > 0 {
         eliminate_holes(&mut nodes, holes, &mut outer_nodes);
     }
-    console::log_1(&JsValue::from("test4"));
     let mut inv_size = f64::max(max[0] - min[0], max[1] - min[0]);
     inv_size = if inv_size != 0.0 { 1.0 / inv_size } else { 0.0 };
     apply_earcut(&mut nodes, &mut outer_nodes, &mut triangles);
-    console::log_1(&JsValue::from("test5"));
     return triangles;
 }
 
@@ -106,7 +98,7 @@ fn eliminate_holes(nodes: &mut [Node], holes: &[usize], list: &mut CircularList<
     let mut queue = Vec::new();
     for i in 0..holes.len() {
         let start = holes[i];
-        let end = if i == holes.len() { nodes.len() } else { holes[i + 1] };
+        let end = if i + 1 == holes.len() { nodes.len() } else { holes[i + 1] };
         let mut list = create_list(&nodes, start, end, true);
         if list.len() == 0 {
             nodes[*list.get(0)].st = true;
@@ -136,9 +128,10 @@ fn apply_earcut(nodes: &mut [Node], list: &mut CircularList<usize>, triangles: &
             triangles.push(cur);
             triangles.push(next);
             list.remove();
-            list.rotate(2);
             stop = *list.get(0);
-        } else if *list.get(0) == stop {
+        }
+        list.rotate(1);
+        if *list.get(0) == stop {
             break;
         }
     }

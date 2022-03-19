@@ -1,6 +1,5 @@
 
 import { LitElement, html, css } from 'lit';
-import earcut from 'earcut';
 
 import WebGLRenderer from './webgl-renderer';
 import WebGLRenderer3d from './webgl-renderer-3d';
@@ -182,27 +181,56 @@ class MapBackendWebGl extends LitElement {
         this.last = null;
     }
 
+    // svgPathForPolygon(poly, min, total_diff, max_size) {
+    //     const vertex = poly.vertex;
+    //     const starts = [0, ...poly.holes, vertex.length / 2];
+    //     const res = [];
+    //     for (let i = 0; i < starts.length - 1; i++) {
+    //         const sub = [];
+    //         const last = [NaN, NaN];
+    //         for (let j = starts[i]; j < starts[i + 1]; j++) {
+    //             const coords = [
+    //                 Math.round(map(vertex[2*j], min[0], min[0] + total_diff, 0, max_size)).toString(),
+    //                 Math.round(map(vertex[2*j + 1], min[1], min[1] + total_diff, 0, max_size)).toString(),
+    //             ];
+    //             if (coords[0] != last[0] || coords[1] != last[1]) {
+    //                 sub.push(j == starts[i] ? ' M' : ' L');
+    //                 sub.push(coords[0] + ',' + coords[1]);
+    //                 last = coords;
+    //             }
+    //         }
+    //         res.push(...sub);
+    //         res.push(' z ');
+    //     }
+    //     return res.join('');
+    // }
+
     generateTriangles(location) {
+        if (!location.proj_polygons) {
+            location.proj_polygons = [...Array(location.raw.count_polygons()).keys()]
+                .map(i => location.raw.get_proj_polygon(i))
+                .map(poly => ({
+                    raw: poly,
+                    vertex: poly.vertex,
+                    holes: poly.holes,
+                    min: poly.min,
+                    max: poly.max
+                }));
+        }
         const polygons = [];
         let vertex_count = 0;
         let triangle_count = 0;
         let outline_count = 0;
-        for (const poly of location.coords) {
-            for (const part of poly) {
-                outline_count += part.length;
-            }
-            const data = earcut.flatten(poly);
-            this.renderer.applyProjection(data.vertices);
-            const triangles = earcut(data.vertices, data.holes, data.dimensions);
-            vertex_count += data.vertices.length;
+        for (const poly of location.proj_polygons) {
+            outline_count += poly.vertex.length / 2;
+            const triangles = poly.raw.triangulate();
+            vertex_count += poly.vertex.length;
             triangle_count += triangles.length;
             polygons.push({
-                vertices: new Float32Array(data.vertices),
+                vertices: poly.vertex,
                 triangles: new Uint16Array(triangles),
-                min: poly.flat().map(this.renderer.projection)
-                    .reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
-                max: poly.flat().map(this.renderer.projection)
-                    .reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
+                min: poly.min,
+                max: poly.max,
             });
         }
         const vertices = new Float32Array(vertex_count);
@@ -220,13 +248,20 @@ class MapBackendWebGl extends LitElement {
         const outline_triangles = new Float32Array(outline_count * 24);
         const outline_normals = new Float32Array(outline_count * 24);
         outline_count = 0;
-        for (const poly of location.coords) {
-            for (const raw_part of poly) {
-                const part = raw_part.map(this.renderer.projection)
-                for (let i = 0; i < part.length; i++) {
-                    const curr = part[i];
-                    const last = part[(part.length + i - 1) % part.length];
-                    const next = part[(i + 1) % part.length];
+        for (const poly of location.proj_polygons) {
+            const starts = [0, ...poly.holes, poly.vertex.length / 2];
+            for (let j = 0; j < starts.length - 1; j++) {
+                const part_len = starts[j + 1] - starts[j];
+                for (let i = 0; i < part_len; i++) {
+                    const curr = [poly.vertex[2 * (j + i)], poly.vertex[2 * (j + i) + 1]];
+                    const last = [
+                        poly.vertex[2 * (j + (part_len + i - 1) % part_len)],
+                        poly.vertex[2 * (j + (part_len + i - 1) % part_len) + 1],
+                    ];
+                    const next = [
+                        poly.vertex[2 * (j + (i + 1) % part_len)],
+                        poly.vertex[2 * (j + (i + 1) % part_len) + 1],
+                    ];
                     const from_last = [curr[0] - last[0], curr[1] - last[1]];
                     const to_next = [next[0] - curr[0], next[1] - curr[1]];
                     const offset = outline_count * 24 + i * 24;
@@ -245,7 +280,7 @@ class MapBackendWebGl extends LitElement {
                         -from_last[1], from_last[0], from_last[1], -from_last[0], to_next[1], -to_next[0],
                     ], offset)
                 }
-                outline_count += part.length;
+                outline_count += starts[j + 1] - starts[j];
             }
         }
         return {
@@ -257,7 +292,6 @@ class MapBackendWebGl extends LitElement {
 
     buildRenderData() {
         this.locations.forEach(loc => {
-            console.log(loc);
             if (loc) {
                 if (!this.location_data[loc.id]) {
                     this.location_data[loc.id] = this.generateTriangles(loc);

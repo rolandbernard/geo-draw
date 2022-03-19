@@ -445,7 +445,12 @@ export default class MapRenderer extends LitElement {
                         const res = await fetch(`${data_location}/${location}.bin`);
                         if (res.ok) {
                             const uint8_array = new Uint8Array(await res.arrayBuffer());
-                            location_cache[location] = LocationData.parse_location_data(uint8_array);
+                            const data = LocationData.parse_location_data(uint8_array);
+                            location_cache[location] = {
+                                id: location,
+                                name: data.name,
+                                raw: data,
+                            };
                         } else {
                             location_cache[location] = null;
                         }
@@ -504,8 +509,7 @@ export default class MapRenderer extends LitElement {
                 const locations = locations_data
                     .filter(loc => loc)
                     .map((loc, i) => ({
-                        name: loc.name,
-                        raw: loc,
+                        ...loc,
                         color: colors[i],
                         data: data.data[i],
                         columns: data.columns,
