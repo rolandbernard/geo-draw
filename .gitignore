@@ -6,6 +6,7 @@ node_modules/
 /data/
 /target/
 /pkg/
+tmp.*
 
 .vscode/
 yarn-error.log

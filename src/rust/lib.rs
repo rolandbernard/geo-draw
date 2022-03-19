@@ -39,10 +39,10 @@ impl Polygon {
         self.min.to_vec()
     }
 
-    // #[wasm_bindgen]
-    // pub fn triangulate(&self) -> Vec<usize> {
-    //     earcut::triangulate(&self.vertex, &self.holes)
-    // }
+    #[wasm_bindgen]
+    pub fn triangulate(&self) -> Vec<usize> {
+        earcut::triangulate(&self.vertex, &self.holes, self.min, self.max)
+    }
 
     fn projected(&self) -> Polygon {
         fn map_projection(lon: f64, lat: f64) -> Point {
