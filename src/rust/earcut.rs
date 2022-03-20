@@ -34,20 +34,20 @@ fn tri_area(a: &Node, b: &Node, c: &Node) -> f64 {
 }
 
 fn point_in_triangle(a: &Node, b: &Node, c: &Node, p: &Node) -> bool {
-    tri_area(p, c, a) >= 0.0 && tri_area(p, a, b) >= 0.0 && tri_area(p, b, c) >= 0.0
+    tri_area(p, c, a) <= 0.0 && tri_area(p, a, b) <= 0.0 && tri_area(p, b, c) <= 0.0
 }
 
-fn poly_area(nodes: &[Node], list: &CircularList<usize>) -> f64 {
+fn poly_area(nodes: &[Node], list: &CircularList) -> f64 {
     let mut sum = 0.0;
     let mut last = list.get(-1);
     for n in list {
-        sum += (nodes[*last].x - nodes[*n].x) * (nodes[*n].y + nodes[*last].y);
+        sum += (nodes[last].x - nodes[n].x) * (nodes[n].y + nodes[last].y);
         last = n;
     }
     return sum;
 }
 
-fn create_list(nodes: &[Node], from: usize, to: usize, rev: bool) -> CircularList<usize> {
+fn create_list(nodes: &[Node], from: usize, to: usize, rev: bool) -> CircularList {
     let mut list = CircularList::new();
     for i in from..to {
         list.insert(i);
@@ -58,14 +58,14 @@ fn create_list(nodes: &[Node], from: usize, to: usize, rev: bool) -> CircularLis
     return list;
 }
 
-fn filter_points(nodes: &[Node], list: &mut CircularList<usize>) {
+fn filter_points(nodes: &[Node], list: &mut CircularList) {
     let mut again = true;
     let mut left = list.len();
     while again || left > 0 {
         again = false;
-        if !nodes[*list.get(0)].st && (
-            nodes[*list.get(0)] == nodes[*list.get(1)]
-            || tri_area(&nodes[*list.get(-1)], &nodes[*list.get(0)], &nodes[*list.get(1)]) == 0.0
+        if !nodes[list.get(0)].st && (
+            nodes[list.get(0)] == nodes[list.get(1)]
+            || tri_area(&nodes[list.get(-1)], &nodes[list.get(0)], &nodes[list.get(1)]) == 0.0
         ) {
             list.remove();
             left = list.len();
@@ -80,11 +80,11 @@ fn filter_points(nodes: &[Node], list: &mut CircularList<usize>) {
     }
 }
 
-fn rotate_to_leftmost(nodes: &[Node], list: &mut CircularList<usize>) {
-    let mut max = *list.get(0);
+fn rotate_to_leftmost(nodes: &[Node], list: &mut CircularList) {
+    let mut max = list.get(0);
     let mut max_idx = 0;
     for i in 0..list.len() {
-        let cur = *list.get(0);
+        let cur = list.get(0);
         if nodes[cur].x < nodes[max].x || (nodes[cur].x == nodes[max].x && nodes[cur].y < nodes[max].y) {
             max = cur;
             max_idx = i;
@@ -94,62 +94,60 @@ fn rotate_to_leftmost(nodes: &[Node], list: &mut CircularList<usize>) {
     list.rotate(max_idx as isize);
 }
 
-fn eliminate_holes(nodes: &mut [Node], holes: &[usize], list: &mut CircularList<usize>) {
+fn eliminate_holes(nodes: &mut [Node], holes: &[usize], list: &mut CircularList) {
     let mut queue = Vec::new();
     for i in 0..holes.len() {
         let start = holes[i];
         let end = if i + 1 == holes.len() { nodes.len() } else { holes[i + 1] };
         let mut list = create_list(&nodes, start, end, true);
         if list.len() == 0 {
-            nodes[*list.get(0)].st = true;
+            nodes[list.get(0)].st = true;
         }
         rotate_to_leftmost(nodes, &mut list);
         queue.push(list);
     }
-    queue.sort_by(|a, b| nodes[*a.get(0)].x.partial_cmp(&nodes[*b.get(0)].x).unwrap());
+    queue.sort_by(|a, b| nodes[a.get(0)].x.partial_cmp(&nodes[b.get(0)].x).unwrap());
     for q in queue {
         eliminate_hole(nodes, q, list);
         filter_points(nodes, list);
     }
 }
 
-fn eliminate_hole(nodes: &[Node], hole: CircularList<usize>, list: &mut CircularList<usize>) {
+fn eliminate_hole(nodes: &[Node], hole: CircularList, list: &mut CircularList) {
     // TODO: implement
 }
 
-fn apply_earcut(nodes: &mut [Node], list: &mut CircularList<usize>, triangles: &mut Vec<usize>) {
-    let mut stop = *list.get(0);
-    while list.len() > 0 {
-        let cur = *list.get(0);
-        let prev = *list.get(-1);
-        let next = *list.get(1);
+fn apply_earcut(nodes: &mut [Node], list: &mut CircularList, triangles: &mut Vec<usize>) {
+    let mut stop = list.len();
+    while list.len() > 0 && stop > 0 {
+        stop -= 1;
+        let cur = list.get(0);
+        let prev = list.get(-1);
+        let next = list.get(1);
         if is_ear(nodes, list) {
             triangles.push(prev);
             triangles.push(cur);
             triangles.push(next);
             list.remove();
-            stop = *list.get(0);
+            stop = list.len();
         }
         list.rotate(1);
-        if *list.get(0) == stop {
-            break;
-        }
     }
 }
 
-fn is_ear(nodes: &mut [Node], list: &mut CircularList<usize>) -> bool {
-    let a = &nodes[*list.get(-1)];
-    let b = &nodes[*list.get(0)];
-    let c = &nodes[*list.get(1)];
+fn is_ear(nodes: &mut [Node], list: &mut CircularList) -> bool {
+    let a = &nodes[list.get(-1)];
+    let b = &nodes[list.get(0)];
+    let c = &nodes[list.get(1)];
     if tri_area(a, b, c) >= 0.0 {
         return false;
     }
     let mut view = list.get_view();
     view.rotate(2);
     for _ in 0..view.len() - 3 {
-        let p_prev = &nodes[*view.get(-1)];
-        let p = &nodes[*view.get(0)];
-        let p_next = &nodes[*view.get(1)];
+        let p_prev = &nodes[view.get(-1)];
+        let p = &nodes[view.get(0)];
+        let p_next = &nodes[view.get(1)];
         if point_in_triangle(a, b, c, p) && tri_area(p_prev, p, p_next) >= 0.0 {
             return false;
         }

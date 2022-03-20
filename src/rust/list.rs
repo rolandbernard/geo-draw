@@ -1,6 +1,6 @@
 
-pub struct CircularList<T> {
-    data: Vec<T>,
+pub struct CircularList {
+    data: Vec<usize>,
     next: Vec<usize>,
     prev: Vec<usize>,
     first: usize,
@@ -8,8 +8,8 @@ pub struct CircularList<T> {
     free: usize,
 }
 
-impl<T> CircularList<T> {
-    pub fn new() -> CircularList<T> {
+impl CircularList {
+    pub fn new() -> CircularList {
         CircularList {
             data: Vec::new(), next: Vec::new(), prev: Vec::new(),
             first: 0, count: 0, free: 0,
@@ -45,17 +45,12 @@ impl<T> CircularList<T> {
         idx
     }
 
-    pub fn get(&self, off: isize) -> &T {
+    pub fn get(&self, off: isize) -> usize {
         let idx = self.get_index(off);
-        &self.data[idx]
+        self.data[idx]
     }
 
-    pub fn get_mut(&mut self, off: isize) -> &mut T {
-        let idx = self.get_index(off);
-        &mut self.data[idx]
-    }
-
-    pub fn insert(&mut self, val: T) {
+    pub fn insert(&mut self, val: usize) {
         let id = self.free;
         if id == self.data.len() {
             self.data.push(val);
@@ -93,47 +88,47 @@ impl<T> CircularList<T> {
         self.count
     }
 
-    pub fn get_view<'a>(&'a self) -> CircularListView<'a, T> {
+    pub fn get_view<'a>(&'a self) -> CircularListView<'a> {
         CircularListView { list: self, at: self.first }
     }
 }
 
-impl<'a, T> IntoIterator for &'a CircularList<T> {
-    type Item = &'a T;
-    type IntoIter = CircularListIterator<'a, T>;
+impl<'a> IntoIterator for &'a CircularList {
+    type Item = usize;
+    type IntoIter = CircularListIterator<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
         CircularListIterator { list: self, at: self.first, seen: 0 }
     }
 }
 
-pub struct CircularListIterator<'a, T> {
-    list: &'a CircularList<T>,
+pub struct CircularListIterator<'a> {
+    list: &'a CircularList,
     at: usize,
     seen: usize,
 }
 
-impl<'a, T> Iterator for CircularListIterator<'a, T> {
-    type Item = &'a T;
+impl<'a> Iterator for CircularListIterator<'a> {
+    type Item = usize;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.seen == self.list.len() {
             None
         } else {
             self.seen += 1;
-            let res = &self.list.data[self.at];
+            let res = self.list.data[self.at];
             self.at = self.list.next[self.at];
             Some(res)
         }
     }
 }
 
-pub struct CircularListView<'a, T> {
-    list: &'a CircularList<T>,
+pub struct CircularListView<'a> {
+    list: &'a CircularList,
     at: usize,
 }
 
-impl<'a, T> CircularListView<'a, T> {
+impl<'a> CircularListView<'a> {
     pub fn rotate(&mut self, off: isize) {
         if self.list.count > 0 {
             for _ in 0..off.abs() {
@@ -159,9 +154,9 @@ impl<'a, T> CircularListView<'a, T> {
         idx
     }
 
-    pub fn get(&self, off: isize) -> &T {
+    pub fn get(&self, off: isize) -> usize {
         let idx = self.get_index(off);
-        &self.list.data[idx]
+        self.list.data[idx]
     }
 
     pub fn len(&self) -> usize {
