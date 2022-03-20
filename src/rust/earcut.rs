@@ -18,7 +18,7 @@ pub fn triangulate(vertex: &[f64], holes: &[usize], min: [f64; 2], max: [f64; 2]
         nodes.push(Node { x: vertex[2*i], y: vertex[2*i + 1], z: f64::NAN, st: false });
     }
     let outer_len = if holes.len() > 0 { holes[0] } else { vertex.len() / 2 };
-    let mut outer_nodes = create_list(&nodes, 0, outer_len, false);
+    let mut outer_nodes = create_list(&nodes, 0, outer_len, false, nodes.len());
     let mut triangles = Vec::new();
     if holes.len() > 0 {
         eliminate_holes(&mut nodes, holes, &mut outer_nodes);
@@ -47,8 +47,25 @@ fn poly_area(nodes: &[Node], list: &CircularList) -> f64 {
     return sum;
 }
 
-fn create_list(nodes: &[Node], from: usize, to: usize, rev: bool) -> CircularList {
-    let mut list = CircularList::new();
+fn lines_intersect(a0: &Node, b0: &Node, a1: &Node, b1: &Node) -> bool {
+    let o1 = tri_area(a0, b0, a1).signum();
+    let o2 = tri_area(a0, b0, b1).signum();
+    let o3 = tri_area(a1, b1, a0).signum();
+    let o4 = tri_area(a1, b1, b0).signum();
+    return o1 != o2 && o3 != o4
+        || (o1 == 0.0 && point_on_segment(a0, b0, a1))
+        || (o2 == 0.0 && point_on_segment(a0, b0, b1))
+        || (o3 == 0.0 && point_on_segment(a1, b1, a0))
+        || (o4 == 0.0 && point_on_segment(a1, b1, b0));
+}
+
+fn point_on_segment(a: &Node, b: &Node, p: &Node) -> bool {
+    p.x <= f64::max(a.x, b.x) && p.x >= f64::min(a.x, b.x)
+    && p.y <= f64::max(a.y, b.y) && p.y >= f64::min(a.y, b.y)
+}
+
+fn create_list(nodes: &[Node], from: usize, to: usize, rev: bool, cap: usize) -> CircularList {
+    let mut list = CircularList::with_capacity(cap);
     for i in from..to {
         list.insert(i);
     }
@@ -99,7 +116,7 @@ fn eliminate_holes(nodes: &mut [Node], holes: &[usize], list: &mut CircularList)
     for i in 0..holes.len() {
         let start = holes[i];
         let end = if i + 1 == holes.len() { nodes.len() } else { holes[i + 1] };
-        let mut list = create_list(&nodes, start, end, true);
+        let mut list = create_list(&nodes, start, end, true, end - start);
         if list.len() == 0 {
             nodes[list.get(0)].st = true;
         }
@@ -117,21 +134,51 @@ fn eliminate_hole(nodes: &[Node], hole: CircularList, list: &mut CircularList) {
     // TODO: implement
 }
 
-fn apply_earcut(nodes: &mut [Node], list: &mut CircularList, triangles: &mut Vec<usize>) {
+fn resolve_intersections(nodes: &mut [Node], list: &mut CircularList, triangles: &mut Vec<usize>) {
     let mut stop = list.len();
     while list.len() > 0 && stop > 0 {
         stop -= 1;
-        let cur = list.get(0);
-        let prev = list.get(-1);
-        let next = list.get(1);
-        if is_ear(nodes, list) {
-            triangles.push(prev);
-            triangles.push(cur);
-            triangles.push(next);
+        let p_prev = &nodes[list.get(-1)];
+        let p = &nodes[list.get(0)];
+        let p_next = &nodes[list.get(1)];
+        let p_next2 = &nodes[list.get(2)];
+        if p_prev != p_next2 && lines_intersect(p_prev, p, p_next, p_next2) {
+            triangles.push(list.get(-1));
+            triangles.push(list.get(0));
+            triangles.push(list.get(1));
+            list.remove();
             list.remove();
             stop = list.len();
         }
         list.rotate(1);
+    }
+}
+
+fn apply_earcut(nodes: &mut [Node], list: &mut CircularList, triangles: &mut Vec<usize>) {
+    let mut pass = 0;
+    while list.len() > 0 && pass < 3 {
+        if pass == 1 {
+            filter_points(nodes, list);
+        } else if pass == 2 {
+            filter_points(nodes, list);
+            resolve_intersections(nodes, list, triangles);
+        }
+        let mut stop = list.len();
+        while list.len() > 0 && stop > 0 {
+            stop -= 1;
+            let cur = list.get(0);
+            let prev = list.get(-1);
+            let next = list.get(1);
+            if is_ear(nodes, list) {
+                triangles.push(prev);
+                triangles.push(cur);
+                triangles.push(next);
+                list.remove();
+                stop = list.len();
+            }
+            list.rotate(1);
+        }
+        pass += 1;
     }
 }
 

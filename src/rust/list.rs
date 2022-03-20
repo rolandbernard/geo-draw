@@ -16,6 +16,15 @@ impl CircularList {
         }
     }
 
+    pub fn with_capacity(size: usize) -> CircularList {
+        CircularList {
+            data: Vec::with_capacity(size),
+            next: Vec::with_capacity(size),
+            prev: Vec::with_capacity(size),
+            first: 0, count: 0, free: 0,
+        }
+    }
+
     pub fn reverse(&mut self) {
         std::mem::swap(&mut self.next, &mut self.prev);
     }
