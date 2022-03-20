@@ -229,14 +229,14 @@ class MapBackendWebGl extends LitElement {
             for (let j = 0; j < starts.length - 1; j++) {
                 const part_len = starts[j + 1] - starts[j];
                 for (let i = 0; i < part_len; i++) {
-                    const curr = [poly.vertex[2 * (j + i)], poly.vertex[2 * (j + i) + 1]];
+                    const curr = [poly.vertex[2 * (starts[j] + i)], poly.vertex[2 * (starts[j] + i) + 1]];
                     const last = [
-                        poly.vertex[2 * (j + (part_len + i - 1) % part_len)],
-                        poly.vertex[2 * (j + (part_len + i - 1) % part_len) + 1],
+                        poly.vertex[2 * (starts[j] + (part_len + i - 1) % part_len)],
+                        poly.vertex[2 * (starts[j] + (part_len + i - 1) % part_len) + 1],
                     ];
                     const next = [
-                        poly.vertex[2 * (j + (i + 1) % part_len)],
-                        poly.vertex[2 * (j + (i + 1) % part_len) + 1],
+                        poly.vertex[2 * (starts[j] + (i + 1) % part_len)],
+                        poly.vertex[2 * (starts[j] + (i + 1) % part_len) + 1],
                     ];
                     const from_last = [curr[0] - last[0], curr[1] - last[1]];
                     const to_next = [next[0] - curr[0], next[1] - curr[1]];
