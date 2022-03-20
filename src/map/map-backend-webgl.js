@@ -181,30 +181,6 @@ class MapBackendWebGl extends LitElement {
         this.last = null;
     }
 
-    // svgPathForPolygon(poly, min, total_diff, max_size) {
-    //     const vertex = poly.vertex;
-    //     const starts = [0, ...poly.holes, vertex.length / 2];
-    //     const res = [];
-    //     for (let i = 0; i < starts.length - 1; i++) {
-    //         const sub = [];
-    //         const last = [NaN, NaN];
-    //         for (let j = starts[i]; j < starts[i + 1]; j++) {
-    //             const coords = [
-    //                 Math.round(map(vertex[2*j], min[0], min[0] + total_diff, 0, max_size)).toString(),
-    //                 Math.round(map(vertex[2*j + 1], min[1], min[1] + total_diff, 0, max_size)).toString(),
-    //             ];
-    //             if (coords[0] != last[0] || coords[1] != last[1]) {
-    //                 sub.push(j == starts[i] ? ' M' : ' L');
-    //                 sub.push(coords[0] + ',' + coords[1]);
-    //                 last = coords;
-    //             }
-    //         }
-    //         res.push(...sub);
-    //         res.push(' z ');
-    //     }
-    //     return res.join('');
-    // }
-
     generateTriangles(location) {
         if (!location.proj_polygons) {
             location.proj_polygons = [...Array(location.raw.count_polygons()).keys()]
