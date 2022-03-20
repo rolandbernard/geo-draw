@@ -4,7 +4,6 @@ use std::f64::consts::PI;
 use wasm_bindgen::prelude::*;
 
 mod earcut;
-mod list;
 
 type Point = [f64; 2];
 
