@@ -1,8 +1,8 @@
 
+#[derive(Clone)]
 struct Node {
-    x: f64, y: f64, z: f64,
+    x: f64, y: f64,
     next: usize, prev: usize,
-    next_z: usize, prev_z: usize,
 }
 
 impl PartialEq for Node {
@@ -13,12 +13,11 @@ impl PartialEq for Node {
 
 pub fn triangulate(vertex: &[f64], holes: &[usize], min: [f64; 2], max: [f64; 2]) -> Vec<usize> {
     let node_len = vertex.len() / 2;
-    let mut nodes = Vec::with_capacity(node_len);
+    let mut nodes = Vec::with_capacity(node_len + 2 * holes.len());
     for i in 0..node_len {
         nodes.push(Node {
-            x: vertex[2*i], y: vertex[2*i + 1], z: f64::NAN,
+            x: vertex[2*i], y: vertex[2*i + 1],
             next: (i + 1) % node_len, prev: (node_len + i - 1) % node_len,
-            next_z: (i + 1) % node_len, prev_z: (node_len + i - 1) % node_len,
         });
     }
     let outer_len = if holes.len() > 0 { holes[0] } else { node_len };
@@ -28,7 +27,7 @@ pub fn triangulate(vertex: &[f64], holes: &[usize], min: [f64; 2], max: [f64; 2]
     }
     let mut inv_size = f64::max(max[0] - min[0], max[1] - min[0]);
     inv_size = if inv_size != 0.0 { 1.0 / inv_size } else { 0.0 };
-    let mut triangles = Vec::with_capacity(3 * node_len);
+    let mut triangles = Vec::with_capacity(3 * (node_len + 2 * holes.len()));
     apply_earcut(&mut nodes, 0, &mut triangles);
     return triangles;
 }
@@ -78,11 +77,6 @@ fn remove_node(nodes: &mut [Node], node: usize) {
     let next = nodes[node].next;
     nodes[prev].next = next;
     nodes[next].prev = prev;
-
-    let prev_z = nodes[node].prev_z;
-    let next_z = nodes[node].next_z;
-    nodes[prev].next_z = next_z;
-    nodes[next].prev_z = prev_z;
 }
 
 fn create_list(nodes: &mut [Node], from: usize, to: usize, rev: bool) {
@@ -137,7 +131,7 @@ fn find_leftmost(nodes: &[Node], head: usize) -> usize {
     return max;
 }
 
-fn eliminate_holes(nodes: &mut [Node], holes: &[usize], mut outer: usize) {
+fn eliminate_holes(nodes: &mut Vec<Node>, holes: &[usize], outer: usize) {
     let mut queue = Vec::new();
     for i in 0..holes.len() {
         let start = holes[i];
@@ -148,12 +142,33 @@ fn eliminate_holes(nodes: &mut [Node], holes: &[usize], mut outer: usize) {
     queue.sort_by(|a, b| nodes[*a].x.partial_cmp(&nodes[*b].x).unwrap());
     for q in queue {
         eliminate_hole(nodes, q, outer);
-        outer = filter_points(nodes, outer);
     }
 }
 
-fn eliminate_hole(nodes: &[Node], hole: usize, outer: usize) {
-    // TODO: implement
+fn eliminate_hole(nodes: &mut Vec<Node>, hole: usize, outer: usize) {
+    let bridge = find_bridge_point(nodes, hole, outer);
+    create_bridge(nodes, bridge, hole);
+}
+
+fn find_bridge_point(nodes: &[Node], hole: usize, outer: usize) -> usize {
+    return outer;
+}
+
+fn create_bridge(nodes: &mut Vec<Node>, a: usize, b: usize) {
+    let a2 = nodes.len();
+    nodes.push(nodes[a].clone());
+    let b2 = nodes.len();
+    nodes.push(nodes[b].clone());
+    let a_next = nodes[a].next;
+    let b_prev = nodes[b].prev;
+    nodes[a2].next = a_next;
+    nodes[a_next].prev = a2;
+    nodes[a2].prev = b2;
+    nodes[b2].next = a2;
+    nodes[b2].prev = b_prev;
+    nodes[b_prev].next = b2;
+    nodes[a].next = b;
+    nodes[b].prev = a;
 }
 
 fn resolve_intersections(nodes: &mut [Node], head: usize, triangles: &mut Vec<usize>) -> usize {
@@ -188,8 +203,8 @@ fn apply_earcut(nodes: &mut [Node], head: usize, triangles: &mut Vec<usize>) {
         if pass == 1 {
             cur = filter_points(nodes, cur);
         } else if pass == 2 {
-            cur = filter_points(nodes, cur);
             cur = resolve_intersections(nodes, cur, triangles);
+            cur = filter_points(nodes, cur);
         }
         let mut stop = cur;
         while nodes[cur].prev != nodes[cur].next {
@@ -200,7 +215,7 @@ fn apply_earcut(nodes: &mut [Node], head: usize, triangles: &mut Vec<usize>) {
                 triangles.push(cur);
                 triangles.push(next);
                 remove_node(nodes, cur);
-                cur = next;
+                cur = nodes[next].next;
                 stop = cur;
             } else {
                 cur = next;
