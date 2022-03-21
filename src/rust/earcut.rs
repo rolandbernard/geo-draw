@@ -1,7 +1,7 @@
 
 #[derive(Clone)]
 struct Node {
-    x: f64, y: f64,
+    i: usize, x: f64, y: f64,
     next: usize, prev: usize,
 }
 
@@ -16,7 +16,7 @@ pub fn triangulate(vertex: &[f64], holes: &[usize], min: [f64; 2], max: [f64; 2]
     let mut nodes = Vec::with_capacity(node_len + 2 * holes.len());
     for i in 0..node_len {
         nodes.push(Node {
-            x: vertex[2*i], y: vertex[2*i + 1],
+            i, x: vertex[2*i], y: vertex[2*i + 1],
             next: (i + 1) % node_len, prev: (node_len + i - 1) % node_len,
         });
     }
@@ -65,6 +65,10 @@ fn lines_intersect(a0: &Node, b0: &Node, a1: &Node, b1: &Node) -> bool {
         || (o2 == 0.0 && point_on_segment(a0, b0, b1))
         || (o3 == 0.0 && point_on_segment(a1, b1, a0))
         || (o4 == 0.0 && point_on_segment(a1, b1, b0));
+}
+
+fn sqr_node_dist(a: &Node, b: &Node) -> f64 {
+    (a.x - b.x)*(a.x - b.x) + (a.y - b.y)*(a.y - b.y)
 }
 
 fn point_on_segment(a: &Node, b: &Node, p: &Node) -> bool {
@@ -117,18 +121,18 @@ fn filter_points(nodes: &mut [Node], head: usize) -> usize {
 }
 
 fn find_leftmost(nodes: &[Node], head: usize) -> usize {
-    let mut max = head;
+    let mut min = head;
     let mut cur = head;
     loop {
-        if nodes[cur].x < nodes[max].x || (nodes[cur].x == nodes[max].x && nodes[cur].y < nodes[max].y) {
-            max = cur;
+        if nodes[cur].x < nodes[min].x || (nodes[cur].x == nodes[min].x && nodes[cur].y < nodes[min].y) {
+            min = cur;
         }
         cur = nodes[cur].next;
         if cur == head {
             break;
         }
     }
-    return max;
+    return min;
 }
 
 fn eliminate_holes(nodes: &mut Vec<Node>, holes: &[usize], outer: usize) {
@@ -151,7 +155,21 @@ fn eliminate_hole(nodes: &mut Vec<Node>, hole: usize, outer: usize) {
 }
 
 fn find_bridge_point(nodes: &[Node], hole: usize, outer: usize) -> usize {
-    return outer;
+    let mut cand = outer;
+    let mut dist_cand = sqr_node_dist(&nodes[cand], &nodes[hole]);
+    let mut cur = outer;
+    loop {
+        let dist = sqr_node_dist(&nodes[cur], &nodes[hole]);
+        if nodes[cand].x > nodes[hole].x || nodes[cur].x <= nodes[hole].x && dist < dist_cand {
+            cand = cur;
+            dist_cand = dist;
+        }
+        cur = nodes[cur].next;
+        if cur == outer {
+            break;
+        }
+    }
+    return cand;
 }
 
 fn create_bridge(nodes: &mut Vec<Node>, a: usize, b: usize) {
@@ -179,9 +197,9 @@ fn resolve_intersections(nodes: &mut [Node], head: usize, triangles: &mut Vec<us
         let next = nodes[cur].next;
         let next2 = nodes[next].next;
         if prev != next2 && lines_intersect(&nodes[prev], &nodes[cur], &nodes[next], &nodes[next2]) {
-            triangles.push(prev);
-            triangles.push(cur);
-            triangles.push(next);
+            triangles.push(nodes[prev].i);
+            triangles.push(nodes[cur].i);
+            triangles.push(nodes[next].i);
             remove_node(nodes, cur);
             remove_node(nodes, next);
             cur = next2;
@@ -200,9 +218,9 @@ fn apply_earcut(nodes: &mut [Node], head: usize, triangles: &mut Vec<usize>) {
     let mut pass = 0;
     let mut cur = head;
     while nodes[cur].prev != nodes[cur].next && pass < 3 {
-        if pass == 1 {
+        if pass < 2 {
             cur = filter_points(nodes, cur);
-        } else if pass == 2 {
+        } else if pass < 3 {
             cur = resolve_intersections(nodes, cur, triangles);
             cur = filter_points(nodes, cur);
         }
@@ -211,9 +229,9 @@ fn apply_earcut(nodes: &mut [Node], head: usize, triangles: &mut Vec<usize>) {
             let prev = nodes[cur].prev;
             let next = nodes[cur].next;
             if is_ear(nodes, cur) {
-                triangles.push(prev);
-                triangles.push(cur);
-                triangles.push(next);
+                triangles.push(nodes[prev].i);
+                triangles.push(nodes[cur].i);
+                triangles.push(nodes[next].i);
                 remove_node(nodes, cur);
                 cur = nodes[next].next;
                 stop = cur;
