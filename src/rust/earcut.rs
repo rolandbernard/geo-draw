@@ -166,8 +166,8 @@ fn find_bridge_point(nodes: &[Node], hole: usize, outer: usize) -> usize {
                     cand = next;
                 }
                 cand_x = sec_x;
+                cand = cur;
             }
-            cand = cur;
         }
         cur = next;
         if cur == outer {
