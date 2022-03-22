@@ -67,10 +67,6 @@ fn lines_intersect(a0: &Node, b0: &Node, a1: &Node, b1: &Node) -> bool {
         || (o4 == 0.0 && point_on_segment(a1, b1, b0));
 }
 
-fn sqr_node_dist(a: &Node, b: &Node) -> f64 {
-    (a.x - b.x)*(a.x - b.x) + (a.y - b.y)*(a.y - b.y)
-}
-
 fn point_on_segment(a: &Node, b: &Node, p: &Node) -> bool {
     p.x <= f64::max(a.x, b.x) && p.x >= f64::min(a.x, b.x)
     && p.y <= f64::max(a.y, b.y) && p.y >= f64::min(a.y, b.y)
@@ -156,13 +152,32 @@ fn eliminate_hole(nodes: &mut Vec<Node>, hole: usize, outer: usize) {
 
 fn find_bridge_point(nodes: &[Node], hole: usize, outer: usize) -> usize {
     let mut cand = outer;
-    let mut dist_cand = sqr_node_dist(&nodes[cand], &nodes[hole]);
+    let mut cand_x = f64::NEG_INFINITY;
     let mut cur = outer;
     loop {
-        let dist = sqr_node_dist(&nodes[cur], &nodes[hole]);
-        if nodes[cand].x > nodes[hole].x || nodes[cur].x <= nodes[hole].x && dist < dist_cand {
+        let next = nodes[cur].next;
+        if nodes[cur].y >= nodes[hole].y && nodes[next].y <= nodes[hole].y {
+            let sec_x = nodes[cur].x + (nodes[hole].y - nodes[cur].y)
+                * (nodes[next].x - nodes[cur].x) / (nodes[next].y - nodes[cur].y);
+            if sec_x <= nodes[hole].x && sec_x >= cand_x {
+                if nodes[cur].x < nodes[next].x {
+                    cand = cur;
+                } else {
+                    cand = next;
+                }
+                cand_x = sec_x;
+            }
             cand = cur;
-            dist_cand = dist;
+        }
+        cur = next;
+        if cur == outer {
+            break;
+        }
+    }
+    loop {
+        let fake_node = Node { i: 0, x: nodes[cand].x, y: nodes[hole].y, next: 0, prev: 0 };
+        if point_in_triangle(&nodes[hole], &fake_node, &nodes[cand], &nodes[cur]) {
+            cand = cur;
         }
         cur = nodes[cur].next;
         if cur == outer {
@@ -216,7 +231,7 @@ fn resolve_intersections(nodes: &mut [Node], head: usize, triangles: &mut Vec<us
 
 fn apply_earcut(nodes: &mut [Node], head: usize, triangles: &mut Vec<usize>) {
     let mut pass = 0;
-    let mut cur = head;
+    let mut cur = filter_points(nodes, head);
     while nodes[cur].prev != nodes[cur].next && pass < 3 {
         if pass < 2 {
             cur = filter_points(nodes, cur);
