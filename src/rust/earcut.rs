@@ -12,6 +12,12 @@ impl PartialEq for Node {
 }
 
 pub fn triangulate(vertex: &[f64], holes: &[usize], min: [f64; 2], max: [f64; 2]) -> Vec<usize> {
+    let mut triangles = Vec::with_capacity(3 * (vertex.len() / 2 + 2 * holes.len()));
+    triangulate_into(&mut triangles, vertex, holes, min, max);
+    return triangles;
+}
+
+pub fn triangulate_into(triangles: &mut Vec<usize>, vertex: &[f64], holes: &[usize], _min: [f64; 2], _max: [f64; 2]) {
     let node_len = vertex.len() / 2;
     let mut nodes = Vec::with_capacity(node_len + 2 * holes.len());
     for i in 0..node_len {
@@ -25,11 +31,7 @@ pub fn triangulate(vertex: &[f64], holes: &[usize], min: [f64; 2], max: [f64; 2]
     if holes.len() > 0 {
         eliminate_holes(&mut nodes, holes, 0);
     }
-    let mut inv_size = f64::max(max[0] - min[0], max[1] - min[0]);
-    inv_size = if inv_size != 0.0 { 1.0 / inv_size } else { 0.0 };
-    let mut triangles = Vec::with_capacity(3 * (node_len + 2 * holes.len()));
-    apply_earcut(&mut nodes, 0, &mut triangles);
-    return triangles;
+    apply_earcut(&mut nodes, 0, triangles);
 }
 
 fn tri_area(a: &Node, b: &Node, c: &Node) -> f64 {
@@ -166,7 +168,6 @@ fn find_bridge_point(nodes: &[Node], hole: usize, outer: usize) -> usize {
                     cand = next;
                 }
                 cand_x = sec_x;
-                cand = cur;
             }
         }
         cur = next;
@@ -214,7 +215,7 @@ fn resolve_intersections(nodes: &mut [Node], head: usize, triangles: &mut Vec<us
         if prev != next2 && lines_intersect(&nodes[prev], &nodes[cur], &nodes[next], &nodes[next2]) {
             triangles.push(nodes[prev].i);
             triangles.push(nodes[cur].i);
-            triangles.push(nodes[next].i);
+            triangles.push(nodes[next2].i);
             remove_node(nodes, cur);
             remove_node(nodes, next);
             cur = next2;
@@ -236,6 +237,7 @@ fn apply_earcut(nodes: &mut [Node], head: usize, triangles: &mut Vec<usize>) {
         if pass < 2 {
             cur = filter_points(nodes, cur);
         } else if pass < 3 {
+            cur = filter_points(nodes, cur);
             cur = resolve_intersections(nodes, cur, triangles);
             cur = filter_points(nodes, cur);
         }
