@@ -8,13 +8,6 @@ const TEXTURE_HEIGHT = 2048;
 const TEXTURE_WIDTH = 4096;
 
 export default class WebGLRenderer3d extends WebGLRenderer {
-    projection(array) {
-        return [...array];
-    }
-
-    applyProjection(_array) {
-        // This is a noop
-    }
 
     clientPosToSpherePos(client_pos, map_pos, state) {
         const scale = this.generateScale(state);

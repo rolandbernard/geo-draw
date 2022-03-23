@@ -4,18 +4,7 @@ import FillVertexShader from './shaders/fill-vertex-shader.glsl';
 import StrokeFragmentShader from './shaders/stroke-fragment-shader.glsl';
 import StrokeVertexShader from './shaders/stroke-vertex-shader.glsl';
 
-import MapRenderer from './map-renderer';
-
 export default class WebGLRenderer {
-    projection(array) {
-        return MapRenderer.project(array);
-    }
-
-    applyProjection(array) {
-        for (let i = 0; i < array.length; i += 2) {
-            [array[i], array[i + 1]] = this.projection([array[i], array[i + 1]]);
-        }
-    }
 
     clientPosToMapPos(client_pos, map_pos, state) {
         const [_, scale] = this.generateTranslateAndScale(state);

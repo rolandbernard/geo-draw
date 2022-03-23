@@ -60,7 +60,9 @@ export default class MapRenderer extends LitElement {
                 height: 100%;
                 max-width: 100%;
                 max-height: 100%;
-                display: block;
+                display: flex;
+                align-items: center;
+                justify-content: center;
                 will-change: cursor;
             }
             div#info-box-wrapper {
@@ -478,9 +480,38 @@ export default class MapRenderer extends LitElement {
         this.render3d = event.target.checked;
     }
 
-    drawMap(locations_data) {
-        const data = this.data;
+    drawMap(location_data, colors, data) {
+        const locations = location_data
+            .filter(loc => loc)
+            .map((loc, i) => ({
+                ...loc,
+                color: colors[i],
+                data: data.data[i],
+                columns: data.columns,
+            }));
+        if (locations.length == 0) {
+            return `<div class="no-data">No data</div>`;
+        } else {
+            return cache(this.render3d
+                ? html`
+                    <map-backend-3d
+                        id="map-backend"
+                        .locations="${locations}"
+                        @hover="${this.handleLocationHover}"
+                    ></map-backend-3d>`
+                : html`
+                    <map-backend
+                        id="map-backend"
+                        .locations="${locations}"
+                        @hover="${this.handleLocationHover}"
+                    ></map-backend>`
+            );
+        }
+    }
+                    
+    render() {
         try {
+            const data = this.data;
             if (data?.locations?.length > 0) {
                 if (data.title) {
                     document.title = data.title;
@@ -506,148 +537,116 @@ export default class MapRenderer extends LitElement {
                 } else {
                     colors = data.locations.map(() => defcolor);
                 }
-                const locations = locations_data
-                    .filter(loc => loc)
-                    .map((loc, i) => ({
-                        ...loc,
-                        color: colors[i],
-                        data: data.data[i],
-                        columns: data.columns,
-                    }));
-                if (locations.length == 0) {
-                    throw 'No data';
-                }
                 const data_min = color_data.reduce((a, b) => a.map((el, i) => Math.min(el, b[i])));
                 const data_max = color_data.reduce((a, b) => a.map((el, i) => Math.max(el, b[i])));
+                const cached = MapRenderer.getCachedLocations(data.locations);
                 return html`
-                    <div
-                        id="map-wrapper"
-                        @wheel="${this.handleScroll}"
-                        @mousedown="${this.handleDragStart}"
-                        @touchstart="${this.handleTouchStart}"
-                        @touchmove="${this.handleTouchMove}"
-                        @touchend="${this.handleTouchEnd}"
-                    >
-                        ${this.details
-                            ? html`
-                                <div id="info-box-wrapper">
-                                    <div id="info-box-background"></div>
-                                    <div id="info-box">
-                                        <div id="info-box-name"></div>
-                                        <hr />
-                                        <div class="info-field">
-                                            ${data.columns.map(col => (html`
-                                                <span class="info-field-name">${col}</span>
-                                                <span class="info-field-value"></span>
-                                            `))}
+                    <div id="map-renderer-root">
+                        <div
+                            id="map-wrapper"
+                            @wheel="${this.handleScroll}"
+                            @mousedown="${this.handleDragStart}"
+                            @touchstart="${this.handleTouchStart}"
+                            @touchmove="${this.handleTouchMove}"
+                            @touchend="${this.handleTouchEnd}"
+                        >
+                            ${this.details
+                                ? html`
+                                    <div id="info-box-wrapper">
+                                        <div id="info-box-background"></div>
+                                        <div id="info-box">
+                                            <div id="info-box-name"></div>
+                                            <hr />
+                                            <div class="info-field">
+                                                ${data.columns.map(col => (html`
+                                                    <span class="info-field-name">${col}</span>
+                                                    <span class="info-field-value"></span>
+                                                `))}
+                                            </div>
                                         </div>
-                                    </div>
-                                </div>`
-                            : html``
-                        }
-                        ${cache(this.render3d
-                            ? html`
-                                <map-backend-3d
-                                    id="map-backend"
-                                    .locations="${locations}"
-                                    @hover="${this.handleLocationHover}"
-                                ></map-backend-3d>`
-                            : html`
-                                <map-backend
-                                    id="map-backend"
-                                    .locations="${locations}"
-                                    @hover="${this.handleLocationHover}"
-                                ></map-backend>`
-                        )}
-                    </div>
-                    <div class="title">${data.title}</div>
-                    <div id="option-box">
-                        <div>
-                            <input type="checkbox" id="details" ?checked=${this.details} @change=${this.handleDetailsChange}>
-                            <label for="details">Details</label>
+                                    </div>`
+                                : html``
+                            }
+                            ${cached.includes(null)
+                                ? until(
+                                    (async () => this.drawMap(await MapRenderer.getLocations(data.locations), colors, data))(),
+                                    html`<ui-spinner></ui-spinner>`
+                                )
+                                : this.drawMap(cached, colors, data)}
                         </div>
-                        ${this.data.allow_3d && hasWebGlSupport()
-                            ? html`
-                                <div>
-                                    <input type="checkbox" id="render3d" ?checked=${this.render3d} @change=${this.handle3dChange}>
-                                    <label for="render3d">3D</label>
-                                </div>`
-                            : html``
-                        }
-                    </div>
-                    <div id="map-legend">
-                        <div class="current-legend">
-                        ${color_data?.[0]?.length > 1
-                        ? (data.colors.map((col, i) => (html`
-                                    <div class="legend-item">
-                                        <span class="color-block" style="${styleMap({
-                            background: col,
-                        })}"></span>
-                                        <span class="legend-label">${data.color_using ? data.columns[data.color_using[i]] : data.color_using[i]}</span>
-                                    </div>
-                                ` )))
-                        : (data.colors.length >= 1
-                            ? (html`
+                        <div class="title">${data.title}</div>
+                        <div id="option-box">
+                            <div>
+                                <input type="checkbox" id="details" ?checked=${this.details} @change=${this.handleDetailsChange}>
+                                <label for="details">Details</label>
+                            </div>
+                            ${this.data.allow_3d && hasWebGlSupport()
+                                ? html`
+                                    <div>
+                                        <input type="checkbox" id="render3d" ?checked=${this.render3d} @change=${this.handle3dChange}>
+                                        <label for="render3d">3D</label>
+                                    </div>`
+                                : html``
+                            }
+                        </div>
+                        <div id="map-legend">
+                            <div class="current-legend">
+                            ${color_data?.[0]?.length > 1
+                                ? (data.colors.map((col, i) => (html`
                                         <div class="legend-item">
-                                            ${data.options
-                                    ? null
-                                    : html`
-                                                        <span class="legend-label">${data.color_using ? data.columns[data.color_using[0]] : data.color_using[0]}</span>
-                                                    `
-                                }
-                                            <span class="color-gradiant">
-                                                <span>${(Math.round(data_max[0] * 100) / 100).toLocaleString()}</span>
-                                                <span class="scale" style="${styleMap({
-                                    background: `linear-gradient(${data.colors[0]},${data.defcolor})`,
+                                            <span class="color-block" style="${styleMap({
+                                    background: col,
                                 })}"></span>
-                                                <span>${(Math.round(data_min[0] * 100) / 100).toLocaleString()}</span>
-                                            </span>
+                                            <span class="legend-label">${data.color_using ? data.columns[data.color_using[i]] : data.color_using[i]}</span>
                                         </div>
-                                    `)
-                            : null
-                        )
-                    }
+                                    ` )))
+                                : (data.colors.length >= 1
+                                    ? (html`
+                                            <div class="legend-item">
+                                                ${data.options
+                                            ? null
+                                            : html`
+                                                            <span class="legend-label">${data.color_using ? data.columns[data.color_using[0]] : data.color_using[0]}</span>
+                                                        `
+                                        }
+                                                <span class="color-gradiant">
+                                                    <span>${(Math.round(data_max[0] * 100) / 100).toLocaleString()}</span>
+                                                    <span class="scale" style="${styleMap({
+                                            background: `linear-gradient(${data.colors[0]},${data.defcolor})`,
+                                        })}"></span>
+                                                    <span>${(Math.round(data_min[0] * 100) / 100).toLocaleString()}</span>
+                                                </span>
+                                            </div>
+                                        `)
+                                    : null
+                                )
+                            }
+                            </div>
+                            ${data.options
+                                ? html`
+                                    <select
+                                        class="select-option"
+                                        @change="${this.handleOptionChange}"
+                                    >${data.options.map((option, i) => html`
+                                            <option
+                                                value="${i}"
+                                                ?selected="${i == data.option_selected}"
+                                            >${option.name}</option>
+                                        `)
+                                    }</select>
+                                `
+                                : null
+                            }
                         </div>
-                        ${data.options
-                        ? html`
-                                <select
-                                    class="select-option"
-                                    @change="${this.handleOptionChange}"
-                                >${data.options.map((option, i) => html`
-                                        <option
-                                            value="${i}"
-                                            ?selected="${i == data.option_selected}"
-                                        >${option.name}</option>
-                                    `)
-                            }</select>
-                            `
-                        : null
-                    }
                     </div>
                 `;
             } else {
                 throw 'No data';
             }
         } catch (e) {
-            return html`<div class="no-data">No data</div>`
-        }
-    }
-
-    render() {
-        const cached = MapRenderer.getCachedLocations(this.data.locations);
-        if (cached.includes(null)) {
             return html`
                 <div id="map-renderer-root">
-                    ${until(
-                        (async () => this.drawMap(await MapRenderer.getLocations(this.data.locations)))(),
-                        html`<ui-spinner></ui-spinner>`
-                    )}
-                </div>
-            `;
-        } else {
-            return html`
-                <div id="map-renderer-root">
-                    ${this.drawMap(cached)}
+                    <div class="no-data">No data</div>
                 </div>
             `;
         }
