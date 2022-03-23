@@ -39,7 +39,10 @@ fn tri_area(a: &Node, b: &Node, c: &Node) -> f64 {
 }
 
 fn point_in_triangle(a: &Node, b: &Node, c: &Node, p: &Node) -> bool {
-    tri_area(p, c, a) <= 0.0 && tri_area(p, a, b) <= 0.0 && tri_area(p, b, c) <= 0.0
+    let a0 = tri_area(p, c, a);
+    let a1 = tri_area(p, a, b);
+    let a2 = tri_area(p, b, c);
+    a0 <= 0.0 && a1 <= 0.0 && a2 <= 0.0
 }
 
 fn poly_area(nodes: &[Node], head: usize) -> f64 {
@@ -62,16 +65,16 @@ fn lines_intersect(a0: &Node, b0: &Node, a1: &Node, b1: &Node) -> bool {
     let o2 = tri_area(a0, b0, b1).signum();
     let o3 = tri_area(a1, b1, a0).signum();
     let o4 = tri_area(a1, b1, b0).signum();
-    return o1 != o2 && o3 != o4
+    o1 != o2 && o3 != o4
         || (o1 == 0.0 && point_on_segment(a0, b0, a1))
         || (o2 == 0.0 && point_on_segment(a0, b0, b1))
         || (o3 == 0.0 && point_on_segment(a1, b1, a0))
-        || (o4 == 0.0 && point_on_segment(a1, b1, b0));
+        || (o4 == 0.0 && point_on_segment(a1, b1, b0))
 }
 
 fn point_on_segment(a: &Node, b: &Node, p: &Node) -> bool {
     p.x <= f64::max(a.x, b.x) && p.x >= f64::min(a.x, b.x)
-    && p.y <= f64::max(a.y, b.y) && p.y >= f64::min(a.y, b.y)
+        && p.y <= f64::max(a.y, b.y) && p.y >= f64::min(a.y, b.y)
 }
 
 fn remove_node(nodes: &mut [Node], node: usize) {
@@ -188,7 +191,7 @@ fn find_bridge_point(nodes: &[Node], hole: usize, outer: usize) -> usize {
     return cand;
 }
 
-fn create_bridge(nodes: &mut Vec<Node>, a: usize, b: usize) {
+fn create_bridge(nodes: &mut Vec<Node>, a: usize, b: usize) -> usize {
     let a2 = nodes.len();
     nodes.push(nodes[a].clone());
     let b2 = nodes.len();
@@ -203,6 +206,7 @@ fn create_bridge(nodes: &mut Vec<Node>, a: usize, b: usize) {
     nodes[b_prev].next = b2;
     nodes[a].next = b;
     nodes[b].prev = a;
+    return a2;
 }
 
 fn resolve_intersections(nodes: &mut [Node], head: usize, triangles: &mut Vec<usize>) -> usize {
@@ -230,9 +234,73 @@ fn resolve_intersections(nodes: &mut [Node], head: usize, triangles: &mut Vec<us
     return cur;
 }
 
-fn apply_earcut(nodes: &mut [Node], head: usize, triangles: &mut Vec<usize>) {
+fn line_intersect_poly(nodes: &[Node], poly: usize, a: &Node, b: &Node) -> bool {
+    let mut cur = poly;
+    loop {
+        let next = nodes[cur].next;
+        if lines_intersect(&nodes[cur], &nodes[next], a, b) {
+            return true;
+        }
+        cur = next;
+        if cur == poly {
+            break;
+        }
+    }
+    return false;
+}
+
+fn locally_inside(a0: &Node, a: &Node, a1: &Node, b: &Node) -> bool {
+    if tri_area(a0, a, a1) < 0.0 {
+        tri_area(a, b, a1) >= 0.0 && tri_area(a, a0, b) >= 0.0
+    } else {
+        tri_area(a, b, a0) < 0.0 || tri_area(a, a1, b) < 0.0
+    }
+}
+
+fn is_possible_diagonal(nodes: &[Node], poly: usize, a: usize, b: usize) -> bool {
+    let a_next = nodes[a].next;
+    let a_prev = nodes[a].prev;
+    let b_next = nodes[b].next;
+    let b_prev = nodes[b].prev;
+    nodes[a].i != nodes[b].i && nodes[a_next].i != nodes[b].i && nodes[a_prev].i != nodes[b].i
+        && locally_inside(&nodes[a_prev], &nodes[a], &nodes[a_next], &nodes[b])
+        && locally_inside(&nodes[b_prev], &nodes[b], &nodes[b_next], &nodes[a])
+        && !line_intersect_poly(nodes, poly, &nodes[a], &nodes[b])
+}
+
+fn split_earcut(nodes: &mut Vec<Node>, head: usize, triangles: &mut Vec<usize>) {
+    let mut cur = head;
+    loop {
+        let next = nodes[cur].next;
+        let mut snd = nodes[next].next;
+        while snd != nodes[cur].prev {
+            if is_possible_diagonal(nodes, head, cur, snd) {
+                let cur2 = create_bridge(nodes, cur, snd);
+                apply_earcut(nodes, cur, triangles);
+                apply_earcut(nodes, cur2, triangles);
+                return;
+            }
+            snd = nodes[snd].next;
+        }
+        cur = next;
+        if cur == head {
+            break;
+        }
+    }
+    while nodes[cur].prev != nodes[cur].next {
+        let prev = nodes[cur].prev;
+        let next = nodes[cur].next;
+        triangles.push(nodes[prev].i);
+        triangles.push(nodes[cur].i);
+        triangles.push(nodes[next].i);
+        remove_node(nodes, cur);
+        cur = nodes[next].next;
+    }
+}
+
+fn apply_earcut(nodes: &mut Vec<Node>, head: usize, triangles: &mut Vec<usize>) {
     let mut pass = 0;
-    let mut cur = filter_points(nodes, head);
+    let mut cur = head;
     while nodes[cur].prev != nodes[cur].next && pass < 3 {
         if pass < 2 {
             cur = filter_points(nodes, cur);
@@ -260,6 +328,9 @@ fn apply_earcut(nodes: &mut [Node], head: usize, triangles: &mut Vec<usize>) {
             }
         }
         pass += 1;
+    }
+    if nodes[cur].prev != nodes[cur].next {
+        split_earcut(nodes, cur, triangles);
     }
 }
 
