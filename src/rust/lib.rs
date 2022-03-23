@@ -1,6 +1,7 @@
 
 use std::f64::consts::PI;
 
+use js_sys::{Uint32Array, Float64Array};
 use wasm_bindgen::prelude::*;
 
 mod earcut;
@@ -11,7 +12,7 @@ type Point = [f64; 2];
 #[derive(Clone)]
 pub struct Polygon {
     vertex: Vec<f64>,
-    holes: Vec<usize>,
+    holes: Vec<u32>,
     min: Point,
     max: Point,
 }
@@ -19,13 +20,13 @@ pub struct Polygon {
 #[wasm_bindgen]
 impl Polygon {
     #[wasm_bindgen(getter)]
-    pub fn vertex(&self) -> Vec<f64> {
-        self.vertex.clone()
+    pub fn vertex(&self) -> Float64Array {
+        unsafe { Float64Array::view(&self.vertex) }
     }
     
     #[wasm_bindgen(getter)]
-    pub fn holes(&self) -> Vec<usize> {
-        self.holes.clone()
+    pub fn holes(&self) -> Uint32Array {
+        unsafe { Uint32Array::view(&self.holes) }
     }
 
     #[wasm_bindgen(getter)]
@@ -39,7 +40,7 @@ impl Polygon {
     }
 
     #[wasm_bindgen]
-    pub fn triangulate(&self) -> Vec<usize> {
+    pub fn triangulate(&self) -> Vec<u32> {
         earcut::triangulate(&self.vertex, &self.holes, self.min, self.max)
     }
 
@@ -155,7 +156,7 @@ impl LocationData {
             len += 4;
             for t in 0..num_path {
                 if t != 0 {
-                    poly.holes.push(poly.vertex.len() / 2);
+                    poly.holes.push((poly.vertex.len() / 2) as u32);
                 }
                 let num_cords = read_unsigned(&raw[len..len + 4]);
                 len += 4;

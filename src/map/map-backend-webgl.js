@@ -184,14 +184,7 @@ class MapBackendWebGl extends LitElement {
     generateTriangles(location) {
         if (!location.proj_polygons) {
             location.proj_polygons = [...Array(location.raw.count_polygons()).keys()]
-                .map(i => location.raw.get_proj_polygon(i))
-                .map(poly => ({
-                    raw: poly,
-                    vertex: poly.vertex,
-                    holes: poly.holes,
-                    min: poly.min,
-                    max: poly.max
-                }));
+                .map(i => location.raw.get_proj_polygon(i));
         }
         const polygons = [];
         let vertex_count = 0;
@@ -199,7 +192,7 @@ class MapBackendWebGl extends LitElement {
         let outline_count = 0;
         for (const poly of location.proj_polygons) {
             outline_count += poly.vertex.length / 2;
-            const triangles = poly.raw.triangulate();
+            const triangles = poly.triangulate();
             vertex_count += poly.vertex.length;
             triangle_count += triangles.length;
             polygons.push({

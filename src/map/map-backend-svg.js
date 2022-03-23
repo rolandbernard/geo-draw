@@ -168,13 +168,7 @@ class MapBackendSvg extends LitElement {
             if(loc) {
                 if (!loc.proj_polygons) {
                     loc.proj_polygons = [...Array(loc.raw.count_polygons()).keys()]
-                        .map(i => loc.raw.get_proj_polygon(i))
-                        .map(poly => ({
-                            vertex: poly.vertex,
-                            holes: poly.holes,
-                            min: poly.min,
-                            max: poly.max
-                        }));
+                        .map(i => loc.raw.get_proj_polygon(i));
                 }
                 loc.svg = loc.proj_polygons.map(poly => (
                     svg`<path d="${this.svgPathForPolygon(poly, min, total_diff, max_size)}"/>`

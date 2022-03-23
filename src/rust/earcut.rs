@@ -11,13 +11,13 @@ impl PartialEq for Node {
     }
 }
 
-pub fn triangulate(vertex: &[f64], holes: &[usize], min: [f64; 2], max: [f64; 2]) -> Vec<usize> {
+pub fn triangulate(vertex: &[f64], holes: &[u32], min: [f64; 2], max: [f64; 2]) -> Vec<u32> {
     let mut triangles = Vec::with_capacity(3 * (vertex.len() / 2 + 2 * holes.len()));
     triangulate_into(&mut triangles, vertex, holes, min, max);
     return triangles;
 }
 
-pub fn triangulate_into(triangles: &mut Vec<usize>, vertex: &[f64], holes: &[usize], _min: [f64; 2], _max: [f64; 2]) {
+pub fn triangulate_into(triangles: &mut Vec<u32>, vertex: &[f64], holes: &[u32], _min: [f64; 2], _max: [f64; 2]) {
     let node_len = vertex.len() / 2;
     let mut nodes = Vec::with_capacity(node_len + 2 * holes.len());
     for i in 0..node_len {
@@ -26,7 +26,7 @@ pub fn triangulate_into(triangles: &mut Vec<usize>, vertex: &[f64], holes: &[usi
             next: (i + 1) % node_len, prev: (node_len + i - 1) % node_len,
         });
     }
-    let outer_len = if holes.len() > 0 { holes[0] } else { node_len };
+    let outer_len = if holes.len() > 0 { holes[0] as usize } else { node_len as usize };
     create_list(&mut nodes, 0, outer_len, false);
     if holes.len() > 0 {
         eliminate_holes(&mut nodes, holes, 0);
@@ -136,11 +136,11 @@ fn find_leftmost(nodes: &[Node], head: usize) -> usize {
     return min;
 }
 
-fn eliminate_holes(nodes: &mut Vec<Node>, holes: &[usize], outer: usize) {
+fn eliminate_holes(nodes: &mut Vec<Node>, holes: &[u32], outer: usize) {
     let mut queue = Vec::new();
     for i in 0..holes.len() {
-        let start = holes[i];
-        let end = if i + 1 == holes.len() { nodes.len() } else { holes[i + 1] };
+        let start = holes[i] as usize;
+        let end = if i + 1 == holes.len() { nodes.len() } else { holes[i + 1] as usize };
         create_list(nodes, start, end, true);
         queue.push(find_leftmost(nodes, start));
     }
@@ -209,7 +209,7 @@ fn create_bridge(nodes: &mut Vec<Node>, a: usize, b: usize) -> usize {
     return a2;
 }
 
-fn resolve_intersections(nodes: &mut [Node], head: usize, triangles: &mut Vec<usize>) -> usize {
+fn resolve_intersections(nodes: &mut [Node], head: usize, triangles: &mut Vec<u32>) -> usize {
     let mut stop = head;
     let mut cur = head;
     while nodes[cur].prev != nodes[cur].next {
@@ -217,9 +217,9 @@ fn resolve_intersections(nodes: &mut [Node], head: usize, triangles: &mut Vec<us
         let next = nodes[cur].next;
         let next2 = nodes[next].next;
         if prev != next2 && lines_intersect(&nodes[prev], &nodes[cur], &nodes[next], &nodes[next2]) {
-            triangles.push(nodes[prev].i);
-            triangles.push(nodes[cur].i);
-            triangles.push(nodes[next2].i);
+            triangles.push(nodes[prev].i as u32);
+            triangles.push(nodes[cur].i as u32);
+            triangles.push(nodes[next2].i as u32);
             remove_node(nodes, cur);
             remove_node(nodes, next);
             cur = next2;
@@ -268,7 +268,7 @@ fn is_possible_diagonal(nodes: &[Node], poly: usize, a: usize, b: usize) -> bool
         && !line_intersect_poly(nodes, poly, &nodes[a], &nodes[b])
 }
 
-fn split_earcut(nodes: &mut Vec<Node>, head: usize, triangles: &mut Vec<usize>) {
+fn split_earcut(nodes: &mut Vec<Node>, head: usize, triangles: &mut Vec<u32>) {
     let mut cur = head;
     loop {
         let next = nodes[cur].next;
@@ -290,15 +290,15 @@ fn split_earcut(nodes: &mut Vec<Node>, head: usize, triangles: &mut Vec<usize>) 
     while nodes[cur].prev != nodes[cur].next {
         let prev = nodes[cur].prev;
         let next = nodes[cur].next;
-        triangles.push(nodes[prev].i);
-        triangles.push(nodes[cur].i);
-        triangles.push(nodes[next].i);
+        triangles.push(nodes[prev].i as u32);
+        triangles.push(nodes[cur].i as u32);
+        triangles.push(nodes[next].i as u32);
         remove_node(nodes, cur);
         cur = nodes[next].next;
     }
 }
 
-fn apply_earcut(nodes: &mut Vec<Node>, head: usize, triangles: &mut Vec<usize>) {
+fn apply_earcut(nodes: &mut Vec<Node>, head: usize, triangles: &mut Vec<u32>) {
     let mut pass = 0;
     let mut cur = head;
     while nodes[cur].prev != nodes[cur].next && pass < 3 {
@@ -314,9 +314,9 @@ fn apply_earcut(nodes: &mut Vec<Node>, head: usize, triangles: &mut Vec<usize>) 
             let prev = nodes[cur].prev;
             let next = nodes[cur].next;
             if is_ear(nodes, cur) {
-                triangles.push(nodes[prev].i);
-                triangles.push(nodes[cur].i);
-                triangles.push(nodes[next].i);
+                triangles.push(nodes[prev].i as u32);
+                triangles.push(nodes[cur].i as u32);
+                triangles.push(nodes[next].i as u32);
                 remove_node(nodes, cur);
                 cur = nodes[next].next;
                 stop = cur;
