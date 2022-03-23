@@ -35,7 +35,7 @@ impl Polygon {
 
     #[wasm_bindgen(getter)]
     pub fn max(&self) -> Vec<f64> {
-        self.min.to_vec()
+        self.max.to_vec()
     }
 
     #[wasm_bindgen]
