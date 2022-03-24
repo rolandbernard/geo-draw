@@ -39,7 +39,6 @@ class MapBackendWebGl extends LitElement {
 
     constructor() {
         super();
-        this.location_data = {};
         this.renderer = this.newRenderer();
         this.state = {
             center: [0, 0],
@@ -83,52 +82,52 @@ class MapBackendWebGl extends LitElement {
     }
 
     handleMouseMove(event) {
-        const pos = this.clientPosToProjPos([event.clientX, event.clientY]);
-        for(const loc of this.locations) {
-            const triangles = this.location_data[loc.id];
-            if(triangles.min[0] <= pos[0] && triangles.min[1] <= pos[1] &&
-                triangles.max[0] >= pos[0] && triangles.max[1] >= pos[1]) {
-                for(const polygon of triangles.polygons) {
-                    if(polygon.min[0] <= pos[0] && polygon.min[1] <= pos[1] &&
-                        polygon.max[0] >= pos[0] && polygon.max[1] >= pos[1]) {
-                        for(let i = 0; i < polygon.triangles.length; i += 3) {
-                            const v1 = [
-                                polygon.vertices[2 * polygon.triangles[i]],
-                                polygon.vertices[2 * polygon.triangles[i] + 1]
-                            ];
-                            const v2 = [
-                                polygon.vertices[2 * polygon.triangles[i + 1]],
-                                polygon.vertices[2 * polygon.triangles[i + 1] + 1]
-                            ];
-                            const v3 = [
-                                polygon.vertices[2 * polygon.triangles[i + 2]],
-                                polygon.vertices[2 * polygon.triangles[i + 2] + 1]
-                            ];
-                            function sign(p1, p2, p3) {
-                                return (p1[0] - p3[0]) * (p2[1] - p3[1]) - (p2[0] - p3[0]) * (p1[1] - p3[1]);
-                            }
-                            const d1 = sign(pos, v1, v2);
-                            const d2 = sign(pos, v2, v3);
-                            const d3 = sign(pos, v3, v1);
-                            const has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
-                            const has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
-                            if(!(has_neg && has_pos)) {
-                                this.state.hover = loc.id;
-                                const my_event = new Event('hover');
-                                my_event.location = loc;
-                                my_event.position = this.projPosToClientPos([
-                                    (polygon.min[0] + polygon.max[0]) / 2,
-                                    (polygon.min[1] + polygon.max[1]) / 2
-                                ]);
-                                this.dispatchEvent(my_event);
-                                return;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        this.handleMouseOut();
+        // const pos = this.clientPosToProjPos([event.clientX, event.clientY]);
+        // for(const loc of this.locations) {
+        //     const triangles = this.location_data[loc.id];
+        //     if(triangles.min[0] <= pos[0] && triangles.min[1] <= pos[1] &&
+        //         triangles.max[0] >= pos[0] && triangles.max[1] >= pos[1]) {
+        //         for(const polygon of triangles.polygons) {
+        //             if(polygon.min[0] <= pos[0] && polygon.min[1] <= pos[1] &&
+        //                 polygon.max[0] >= pos[0] && polygon.max[1] >= pos[1]) {
+        //                 for(let i = 0; i < polygon.triangles.length; i += 3) {
+        //                     const v1 = [
+        //                         polygon.vertices[2 * polygon.triangles[i]],
+        //                         polygon.vertices[2 * polygon.triangles[i] + 1]
+        //                     ];
+        //                     const v2 = [
+        //                         polygon.vertices[2 * polygon.triangles[i + 1]],
+        //                         polygon.vertices[2 * polygon.triangles[i + 1] + 1]
+        //                     ];
+        //                     const v3 = [
+        //                         polygon.vertices[2 * polygon.triangles[i + 2]],
+        //                         polygon.vertices[2 * polygon.triangles[i + 2] + 1]
+        //                     ];
+        //                     function sign(p1, p2, p3) {
+        //                         return (p1[0] - p3[0]) * (p2[1] - p3[1]) - (p2[0] - p3[0]) * (p1[1] - p3[1]);
+        //                     }
+        //                     const d1 = sign(pos, v1, v2);
+        //                     const d2 = sign(pos, v2, v3);
+        //                     const d3 = sign(pos, v3, v1);
+        //                     const has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+        //                     const has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+        //                     if(!(has_neg && has_pos)) {
+        //                         this.state.hover = loc.id;
+        //                         const my_event = new Event('hover');
+        //                         my_event.location = loc;
+        //                         my_event.position = this.projPosToClientPos([
+        //                             (polygon.min[0] + polygon.max[0]) / 2,
+        //                             (polygon.min[1] + polygon.max[1]) / 2
+        //                         ]);
+        //                         this.dispatchEvent(my_event);
+        //                         return;
+        //                     }
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
+        // this.handleMouseOut();
     }
 
     handleMouseOut() {
@@ -157,7 +156,7 @@ class MapBackendWebGl extends LitElement {
             || this.last.hover != this.state.hover
             || this.last.size != this.state.size
         ) {
-            this.renderer.renderMapInContext(this.locations, this.location_data, this.state)
+            this.renderer.renderMapInContext(this.locations, this.triangulated, this.state)
             this.last = { ...this.state };
         }
         window.requestAnimationFrame(this.renderMapInCanvas.bind(this));
@@ -167,7 +166,7 @@ class MapBackendWebGl extends LitElement {
         const canvas = this.shadowRoot.getElementById('map');
         if (this.last_canvas != canvas) {
             this.last_canvas = canvas;
-            this.renderer.deinitResources(this.locations, this.location_data);
+            this.renderer.deinitResources(this.locations, this.triangulated);
             const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
             const handleResize = () => {
                 canvas.width = canvas.clientWidth;
@@ -177,7 +176,7 @@ class MapBackendWebGl extends LitElement {
             }
             window.addEventListener('resize', handleResize);
             handleResize();
-            this.renderer.initForContext(canvas, gl, this.locations, this.location_data);
+            this.renderer.initForContext(canvas, gl, this.locations, this.triangulated);
             this.renderMapInCanvas();
         }
         this.last = null;
@@ -265,13 +264,10 @@ class MapBackendWebGl extends LitElement {
         this.triangulated = TriangulatedData.new();
         for (const loc of this.locations) {
             if (loc) {
-                if (!this.location_data[loc.id]) {
-                    this.location_data[loc.id] = this.generateTriangles(loc);
-                }
-                this.triangulated.add_location(loc.raw.ptr);
+                this.triangulated.add_location(loc.raw);
             }
         }
-        this.triangulated.triangulate(false);
+        this.triangulated.triangulate(true);
         this.state.min = this.triangulated.min;
         this.state.max = this.triangulated.max;
     }

@@ -1,17 +1,17 @@
 
-use std::f64::consts::PI;
+use std::f32::consts::PI;
 
-use js_sys::{Uint32Array, Float64Array};
+use js_sys::{Uint32Array, Float32Array};
 use wasm_bindgen::prelude::*;
 
 mod earcut;
 
-type Point = [f64; 2];
+type Point = [f32; 2];
 
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct Polygon {
-    vertex: Vec<f64>,
+    vertex: Vec<f32>,
     holes: Vec<u32>,
     min: Point,
     max: Point,
@@ -26,8 +26,8 @@ impl Polygon {
 #[wasm_bindgen]
 impl Polygon {
     #[wasm_bindgen(getter)]
-    pub fn vertex(&self) -> Float64Array {
-        unsafe { Float64Array::view(&self.vertex) }
+    pub fn vertex(&self) -> Float32Array {
+        unsafe { Float32Array::view(&self.vertex) }
     }
     
     #[wasm_bindgen(getter)]
@@ -36,12 +36,12 @@ impl Polygon {
     }
 
     #[wasm_bindgen(getter)]
-    pub fn min(&self) -> Vec<f64> {
+    pub fn min(&self) -> Vec<f32> {
         self.min.to_vec()
     }
 
     #[wasm_bindgen(getter)]
-    pub fn max(&self) -> Vec<f64> {
+    pub fn max(&self) -> Vec<f32> {
         self.max.to_vec()
     }
 
@@ -51,17 +51,17 @@ impl Polygon {
     }
 
     fn projected(&self) -> Polygon {
-        fn map_projection(lon: f64, lat: f64) -> Point {
+        fn map_projection(lon: f32, lat: f32) -> Point {
             [
                 PI + lon,
-                PI - f64::ln(f64::tan(
-                    PI / 4.0 + if f64::abs(lat) > 85.0 { f64::signum(lat) * 85.0 } else { lat } / 2.0
+                PI - f32::ln(f32::tan(
+                    PI / 4.0 + if f32::abs(lat) > 85.0 { f32::signum(lat) * 85.0 } else { lat } / 2.0
                 ))
             ]
         }
         let mut poly = Polygon {
             vertex: self.vertex.clone(), holes: self.holes.clone(),
-            min: [f64::MAX, f64::MAX], max: [f64::MIN, f64::MIN]
+            min: [f32::MAX, f32::MAX], max: [f32::MIN, f32::MIN]
         };
         for i in (0..self.vertex.len()).step_by(2) {
             let proj = map_projection(self.vertex[i], self.vertex[i + 1]);
@@ -95,12 +95,12 @@ impl LocationData {
     }
 
     #[wasm_bindgen(getter)]
-    pub fn min(&self) -> Vec<f64> {
+    pub fn min(&self) -> Vec<f32> {
         self.min.to_vec()
     }
 
     #[wasm_bindgen(getter)]
-    pub fn max(&self) -> Vec<f64> {
+    pub fn max(&self) -> Vec<f32> {
         self.max.to_vec()
     }
 
@@ -120,12 +120,12 @@ impl LocationData {
     }
 
     #[wasm_bindgen(getter)]
-    pub fn proj_min(&self) -> Vec<f64> {
+    pub fn proj_min(&self) -> Vec<f32> {
         self.proj_min.to_vec()
     }
 
     #[wasm_bindgen(getter)]
-    pub fn proj_max(&self) -> Vec<f64> {
+    pub fn proj_max(&self) -> Vec<f32> {
         self.proj_max.to_vec()
     }
 
@@ -148,15 +148,15 @@ impl LocationData {
         let mut polygons = Vec::new();
         let mut proj_polygons = Vec::new();
         let num_poly = read_unsigned(&raw[len..len + 4]);
-        let mut min = [f64::MAX, f64::MAX];
-        let mut max = [f64::MIN, f64::MIN];
-        let mut proj_min = [f64::MAX, f64::MAX];
-        let mut proj_max = [f64::MIN, f64::MIN];
+        let mut min = [f32::MAX, f32::MAX];
+        let mut max = [f32::MIN, f32::MIN];
+        let mut proj_min = [f32::MAX, f32::MAX];
+        let mut proj_max = [f32::MIN, f32::MIN];
         len += 4;
         for _ in 0..num_poly {
             let mut poly = Polygon {
                 vertex: Vec::new(), holes: Vec::new(),
-                min: [f64::MAX, f64::MAX], max: [f64::MIN, f64::MIN]
+                min: [f32::MAX, f32::MAX], max: [f32::MIN, f32::MIN]
             };
             let num_path = read_unsigned(&raw[len..len + 4]);
             len += 4;
@@ -167,9 +167,9 @@ impl LocationData {
                 let num_cords = read_unsigned(&raw[len..len + 4]);
                 len += 4;
                 for _ in 0..num_cords {
-                    let lon = read_signed(&raw[len..len + 4]) as f64 * PI / 180.0e7;
+                    let lon = read_signed(&raw[len..len + 4]) as f32 * PI / 180.0e7;
                     len += 4;
-                    let lat = read_signed(&raw[len..len + 4]) as f64 * PI / 180.0e7;
+                    let lat = read_signed(&raw[len..len + 4]) as f32 * PI / 180.0e7;
                     len += 4;
                     poly.min[0] = poly.min[0].min(lon);
                     poly.min[1] = poly.min[1].min(lat);
@@ -204,7 +204,7 @@ impl LocationData {
 #[wasm_bindgen]
 pub struct TriangulatedData {
     locs: Vec<*const LocationData>,
-    vertex: Vec<f64>,
+    vertex: Vec<f32>,
     color: Vec<u32>,
     triangles: Vec<u32>,
     polygons: Vec<u32>,
@@ -215,8 +215,8 @@ pub struct TriangulatedData {
 #[wasm_bindgen]
 impl TriangulatedData {
     #[wasm_bindgen(getter)]
-    pub fn vertex(&self) -> Float64Array {
-        unsafe { Float64Array::view(&self.vertex) }
+    pub fn vertex(&self) -> Float32Array {
+        unsafe { Float32Array::view(&self.vertex) }
     }
 
     #[wasm_bindgen(getter)]
@@ -233,18 +233,28 @@ impl TriangulatedData {
     pub fn polygons(&self) -> Uint32Array {
         unsafe { Uint32Array::view(&self.polygons) }
     }
-    
+
+    #[wasm_bindgen(getter)]
+    pub fn min(&self) -> Vec<f32> {
+        self.min.to_vec()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn max(&self) -> Vec<f32> {
+        self.max.to_vec()
+    }
+
     #[wasm_bindgen]
     pub fn new() -> TriangulatedData {
         TriangulatedData {
             locs: Vec::new(), vertex: Vec::new(), color: Vec::new(),
             triangles: Vec::new(), polygons: Vec::new(),
-            min: [f64::MAX, f64::MAX], max: [f64::MIN, f64::MIN],
+            min: [f32::MAX, f32::MAX], max: [f32::MIN, f32::MIN],
         }
     }
     
     #[wasm_bindgen]
-    pub fn add_location(&mut self, loc: *const LocationData) {
+    pub fn add_location(&mut self, loc: &LocationData) {
         self.locs.push(loc);
     }
 
@@ -258,11 +268,11 @@ impl TriangulatedData {
                 let old = self.triangles.len();
                 poly.triangulate_into(&mut self.triangles);
                 for j in old..self.triangles.len() {
-                    self.triangles[j] += self.vertex.len() as u32;
+                    self.triangles[j] += (self.vertex.len() / 2) as u32;
                 }
                 self.vertex.extend(&poly.vertex);
                 self.polygons.push(old as u32);
-                for _ in 0..poly.vertex.len() {
+                for _ in 0..poly.vertex.len() / 2 {
                     self.color.push(i as u32 + 1);
                 }
                 self.min[0] = self.min[0].min(poly.min[0]);

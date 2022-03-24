@@ -1,7 +1,7 @@
 
 #[derive(Clone)]
 struct Node {
-    i: usize, x: f64, y: f64,
+    i: usize, x: f32, y: f32,
     next: usize, prev: usize,
 }
 
@@ -11,13 +11,13 @@ impl PartialEq for Node {
     }
 }
 
-pub fn triangulate(vertex: &[f64], holes: &[u32], min: [f64; 2], max: [f64; 2]) -> Vec<u32> {
+pub fn triangulate(vertex: &[f32], holes: &[u32], min: [f32; 2], max: [f32; 2]) -> Vec<u32> {
     let mut triangles = Vec::with_capacity(3 * (vertex.len() / 2 + 2 * holes.len()));
     triangulate_into(&mut triangles, vertex, holes, min, max);
     return triangles;
 }
 
-pub fn triangulate_into(triangles: &mut Vec<u32>, vertex: &[f64], holes: &[u32], _min: [f64; 2], _max: [f64; 2]) {
+pub fn triangulate_into(triangles: &mut Vec<u32>, vertex: &[f32], holes: &[u32], _min: [f32; 2], _max: [f32; 2]) {
     let node_len = vertex.len() / 2;
     let mut nodes = Vec::with_capacity(node_len + 2 * holes.len());
     for i in 0..node_len {
@@ -34,7 +34,7 @@ pub fn triangulate_into(triangles: &mut Vec<u32>, vertex: &[f64], holes: &[u32],
     apply_earcut(&mut nodes, 0, triangles);
 }
 
-fn tri_area(a: &Node, b: &Node, c: &Node) -> f64 {
+fn tri_area(a: &Node, b: &Node, c: &Node) -> f32 {
     (b.y - a.y) * (c.x - b.x) - (b.x - a.x) * (c.y - b.y)
 }
 
@@ -45,7 +45,7 @@ fn point_in_triangle(a: &Node, b: &Node, c: &Node, p: &Node) -> bool {
     a0 <= 0.0 && a1 <= 0.0 && a2 <= 0.0
 }
 
-fn poly_area(nodes: &[Node], head: usize) -> f64 {
+fn poly_area(nodes: &[Node], head: usize) -> f32 {
     let mut sum = 0.0;
     let mut last = nodes[head].prev;
     let mut cur = head;
@@ -73,8 +73,8 @@ fn lines_intersect(a0: &Node, b0: &Node, a1: &Node, b1: &Node) -> bool {
 }
 
 fn point_on_segment(a: &Node, b: &Node, p: &Node) -> bool {
-    p.x <= f64::max(a.x, b.x) && p.x >= f64::min(a.x, b.x)
-        && p.y <= f64::max(a.y, b.y) && p.y >= f64::min(a.y, b.y)
+    p.x <= f32::max(a.x, b.x) && p.x >= f32::min(a.x, b.x)
+        && p.y <= f32::max(a.y, b.y) && p.y >= f32::min(a.y, b.y)
 }
 
 fn remove_node(nodes: &mut [Node], node: usize) {
@@ -157,7 +157,7 @@ fn eliminate_hole(nodes: &mut Vec<Node>, hole: usize, outer: usize) {
 
 fn find_bridge_point(nodes: &[Node], hole: usize, outer: usize) -> usize {
     let mut cand = outer;
-    let mut cand_x = f64::NEG_INFINITY;
+    let mut cand_x = f32::NEG_INFINITY;
     let mut cur = outer;
     loop {
         let next = nodes[cur].next;
