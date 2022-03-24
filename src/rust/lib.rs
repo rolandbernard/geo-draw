@@ -205,7 +205,7 @@ impl LocationData {
 pub struct TriangulatedData {
     locs: Vec<*const LocationData>,
     vertex: Vec<f32>,
-    color: Vec<u32>,
+    color: Vec<f32>,
     triangles: Vec<u32>,
     polygons: Vec<u32>,
     min: Point,
@@ -220,8 +220,8 @@ impl TriangulatedData {
     }
 
     #[wasm_bindgen(getter)]
-    pub fn color(&self) -> Uint32Array {
-        unsafe { Uint32Array::view(&self.color) }
+    pub fn color(&self) -> Float32Array {
+        unsafe { Float32Array::view(&self.color) }
     }
 
     #[wasm_bindgen(getter)]
@@ -273,7 +273,7 @@ impl TriangulatedData {
                 self.vertex.extend(&poly.vertex);
                 self.polygons.push(old as u32);
                 for _ in 0..poly.vertex.len() / 2 {
-                    self.color.push(i as u32 + 1);
+                    self.color.push((i as f32 + 0.5) / self.locs.len() as f32);
                 }
                 self.min[0] = self.min[0].min(poly.min[0]);
                 self.min[1] = self.min[1].min(poly.min[1]);

@@ -12,3 +12,4 @@ void main() {
         (aVertexPosition + uTranslate) * uScale + normalize(aVertexNormal) * uWidth * uStrokeScale,
         0.0, 1.0);
 }
+
