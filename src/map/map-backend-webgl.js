@@ -4,6 +4,8 @@ import { LitElement, html, css } from 'lit';
 import WebGLRenderer from './webgl-renderer';
 import WebGLRenderer3d from './webgl-renderer-3d';
 
+import { TriangulatedData } from '../../pkg/index'
+
 class MapBackendWebGl extends LitElement {
 
     static get properties() {
@@ -260,17 +262,18 @@ class MapBackendWebGl extends LitElement {
     }
 
     buildRenderData() {
-        this.locations.forEach(loc => {
+        this.triangulated = TriangulatedData.new();
+        for (const loc of this.locations) {
             if (loc) {
                 if (!this.location_data[loc.id]) {
                     this.location_data[loc.id] = this.generateTriangles(loc);
                 }
+                this.triangulated.add_location(loc.raw.ptr);
             }
-        });
-        this.state.min = this.locations.map(l => this.location_data[l.id].min)
-            .reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]);
-        this.state.max = this.locations.map(l => this.location_data[l.id].max)
-            .reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]);
+        }
+        this.triangulated.triangulate(false);
+        this.state.min = this.triangulated.min;
+        this.state.max = this.triangulated.max;
     }
 
     render() {

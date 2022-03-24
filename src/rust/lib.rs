@@ -17,6 +17,12 @@ pub struct Polygon {
     max: Point,
 }
 
+impl Polygon {
+    pub fn triangulate_into(&self, triangles: &mut Vec<u32>) {
+        earcut::triangulate_into(triangles, &self.vertex, &self.holes, self.min, self.max);
+    }
+}
+
 #[wasm_bindgen]
 impl Polygon {
     #[wasm_bindgen(getter)]
@@ -192,6 +198,79 @@ impl LocationData {
             min: min, max: max,
             proj_min: proj_min, proj_max: proj_max,
         };
+    }
+}
+
+#[wasm_bindgen]
+pub struct TriangulatedData {
+    locs: Vec<*const LocationData>,
+    vertex: Vec<f64>,
+    color: Vec<u32>,
+    triangles: Vec<u32>,
+    polygons: Vec<u32>,
+    min: Point,
+    max: Point,
+}
+
+#[wasm_bindgen]
+impl TriangulatedData {
+    #[wasm_bindgen(getter)]
+    pub fn vertex(&self) -> Float64Array {
+        unsafe { Float64Array::view(&self.vertex) }
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn color(&self) -> Uint32Array {
+        unsafe { Uint32Array::view(&self.color) }
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn triangles(&self) -> Uint32Array {
+        unsafe { Uint32Array::view(&self.triangles) }
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn polygons(&self) -> Uint32Array {
+        unsafe { Uint32Array::view(&self.polygons) }
+    }
+    
+    #[wasm_bindgen]
+    pub fn new() -> TriangulatedData {
+        TriangulatedData {
+            locs: Vec::new(), vertex: Vec::new(), color: Vec::new(),
+            triangles: Vec::new(), polygons: Vec::new(),
+            min: [f64::MAX, f64::MAX], max: [f64::MIN, f64::MIN],
+        }
+    }
+    
+    #[wasm_bindgen]
+    pub fn add_location(&mut self, loc: *const LocationData) {
+        self.locs.push(loc);
+    }
+
+    #[wasm_bindgen]
+    pub fn triangulate(&mut self, proj: bool) {
+        for (i, &loc) in self.locs.iter().enumerate() {
+            let polys = unsafe {
+                if proj { &(*loc).proj_polygons } else { &(*loc).polygons }
+            };
+            for poly in polys {
+                let old = self.triangles.len();
+                poly.triangulate_into(&mut self.triangles);
+                for j in old..self.triangles.len() {
+                    self.triangles[j] += self.vertex.len() as u32;
+                }
+                self.vertex.extend(&poly.vertex);
+                self.polygons.push(old as u32);
+                for _ in 0..poly.vertex.len() {
+                    self.color.push(i as u32 + 1);
+                }
+                self.min[0] = self.min[0].min(poly.min[0]);
+                self.min[1] = self.min[1].min(poly.min[1]);
+                self.max[0] = self.max[0].max(poly.max[0]);
+                self.max[1] = self.max[1].max(poly.max[1]);
+            }
+        }
     }
 }
 
