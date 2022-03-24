@@ -272,8 +272,8 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         ];
         const scale = [1 / (max[0] - min[0]) / Math.PI, 2 / (max[1] - min[1]) / Math.PI];
         const stroke_scale = [
-            0.5 / (max[0] - min[0]) / Math.cbrt(state.scale),
-            0.5 / (max[1] - min[1]) / Math.cbrt(state.scale)
+            0.5 / (max[0] - min[0]) * Math.cbrt(state.scale) / state.scale,
+            0.5 / (max[1] - min[1]) * Math.cbrt(state.scale) / state.scale
         ];
 
         gl.clearColor(0.0, 0.0, 0.0, 0.0);
@@ -298,10 +298,9 @@ export default class WebGLRenderer3d extends WebGLRenderer {
 
         // Draw fill
         gl.useProgram(fill_data.shader_program);
-        gl.uniform2fv(fill_data.translate_uniform, translate);
         gl.uniform2fv(fill_data.scale_uniform, scale);
         gl.uniform1i(fill_data.colors_uniform, 0);
-        
+            
         gl.bindBuffer(gl.ARRAY_BUFFER, triangles.position_buffer);
         gl.vertexAttribPointer(fill_data.position_attribute, 2, gl.FLOAT, false, 0, 0);
         gl.enableVertexAttribArray(fill_data.position_attribute);
@@ -311,11 +310,14 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         gl.enableVertexAttribArray(fill_data.color_attribute);
 
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, triangles.index_buffer);
-        gl.drawElements(gl.TRIANGLES, triangulated.triangles.length, gl.UNSIGNED_INT, 0);
+        for (let x = 0; x <= 1; x++) {
+            gl.uniform2fv(fill_data.translate_uniform, translate);
+            gl.drawElements(gl.TRIANGLES, triangulated.triangles.length, gl.UNSIGNED_INT, 0);
+            translate[0] += 2 * Math.PI;
+        }
 
         // Draw stroke
         gl.useProgram(stroke_data.shader_program);
-        gl.uniform2fv(stroke_data.translate_uniform, translate);
         gl.uniform2fv(stroke_data.scale_uniform, scale);
         gl.uniform2fv(stroke_data.scale2_uniform, stroke_scale);
         gl.uniform1f(stroke_data.width_uniform, 0.0025);
@@ -328,8 +330,12 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         gl.bindBuffer(gl.ARRAY_BUFFER, triangles.outline_position_buffer);
         gl.vertexAttribPointer(stroke_data.position_attribute, 2, gl.FLOAT, false, 0, 0);
         gl.enableVertexAttribArray(stroke_data.position_attribute);
-
-        gl.drawArrays(gl.TRIANGLES, 0, triangulated.outline_triangles.length / 2);
+        translate[0] -= 4 * Math.PI;
+        for (let x = 0; x <= 1; x++) {
+            gl.uniform2fv(stroke_data.translate_uniform, translate);
+            gl.drawArrays(gl.TRIANGLES, 0, triangulated.outline_triangles.length / 2);
+            translate[0] += 2 * Math.PI;
+        }
 
         gl.viewport(0, 0, this.webgl_data.canvas.clientWidth, this.webgl_data.canvas.clientHeight);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
