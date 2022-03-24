@@ -5,6 +5,9 @@ import StrokeFragmentShader from './shaders/stroke-fragment-shader.glsl';
 import StrokeVertexShader from './shaders/stroke-vertex-shader.glsl';
 
 export default class WebGLRenderer {
+    project() {
+        return true;
+    }
 
     clientPosToMapPos(client_pos, map_pos, state) {
         const [_, scale] = this.generateTranslateAndScale(state);

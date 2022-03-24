@@ -188,8 +188,8 @@ class MapBackendWebGl extends LitElement {
             for (const loc of this.locations) {
                 this.triangulated.add_location(loc.raw);
             }
-            this.triangulated.triangulate(true);
-            this.triangulated.generate_outlines(true);
+            this.triangulated.triangulate(this.renderer.project());
+            this.triangulated.generate_outlines(this.renderer.project());
             this.state.min = this.triangulated.min;
             this.state.max = this.triangulated.max;
         }

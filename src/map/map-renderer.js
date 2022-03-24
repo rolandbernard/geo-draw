@@ -490,7 +490,7 @@ export default class MapRenderer extends LitElement {
                 columns: data.columns,
             }));
         if (locations.length == 0) {
-            return `<div class="no-data">No data</div>`;
+            return html`<div class="no-data">No data</div>`;
         } else {
             return cache(this.render3d
                 ? html`

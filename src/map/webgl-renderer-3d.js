@@ -8,6 +8,9 @@ const TEXTURE_HEIGHT = 2048;
 const TEXTURE_WIDTH = 4096;
 
 export default class WebGLRenderer3d extends WebGLRenderer {
+    project() {
+        return false;
+    }
 
     clientPosToSpherePos(client_pos, map_pos, state) {
         const scale = this.generateScale(state);
@@ -187,8 +190,8 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         return res;
     }
 
-    initForContext(canvas, gl, locations, location_data) {
-        super.initForContext(canvas, gl, locations, location_data);
+    initForContext(canvas, gl, locations, triangulated) {
+        super.initForContext(canvas, gl, locations, triangulated);
         
         const texture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -236,7 +239,7 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         };
     }
 
-    deinitResources(locations, location_data) {
+    deinitResources(locations, triangulated) {
         if (this.webgl_data?.context) {
             const gl = this.webgl_data.context;
             gl.deleteTexture(this.webgl_data.texture);
@@ -247,14 +250,16 @@ export default class WebGLRenderer3d extends WebGLRenderer {
             });
             gl.deleteProgram(this.webgl_data.earth_data.shader_program);
         }
-        super.deinitResources(locations, location_data);
+        super.deinitResources(locations, triangulated);
     }
 
-    renderToTexture(locations, location_data, state, min, max) {
+    renderToTexture(locations, triangulated, state, min, max) {
         const gl = this.webgl_data.context;
         const fill_data = this.webgl_data.fill_data;
         const stroke_data = this.webgl_data.stroke_data;
+        const triangles = this.webgl_data.triangles;
 
+        gl.bindTexture(gl.TEXTURE_2D, this.webgl_data.texture);
         const fb = gl.createFramebuffer();
         gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
         const attachment = gl.COLOR_ATTACHMENT0;
@@ -267,77 +272,82 @@ export default class WebGLRenderer3d extends WebGLRenderer {
         ];
         const scale = [1 / (max[0] - min[0]) / Math.PI, 2 / (max[1] - min[1]) / Math.PI];
         const stroke_scale = [
-            0.5 / (max[0] - min[0]) / state.scale,
-            0.5 / (max[1] - min[1]) / state.scale
+            0.5 / (max[0] - min[0]) / Math.cbrt(state.scale),
+            0.5 / (max[1] - min[1]) / Math.cbrt(state.scale)
         ];
 
         gl.clearColor(0.0, 0.0, 0.0, 0.0);
         gl.clear(gl.COLOR_BUFFER_BIT);
 
-        for (let x = 0; x <= 1; x++) {
-            for (let i = 0; i < locations.length; i++) {
-                const loc = locations[i];
-                const triangles = location_data[loc.id];
-                if (
-                    (triangles.min[0] + translate[0]) * scale[0] <= 1
-                    && (triangles.max[0] + translate[0]) * scale[0] >= -1
-                    && (triangles.min[1] + translate[1]) * scale[1] <= 1
-                    && (triangles.max[1] + translate[1]) * scale[1] >= -1
-                ) {
-                    // Draw stroke
-                    gl.useProgram(stroke_data.shader_program);
-                    gl.uniform2fv(stroke_data.translate_uniform, translate);
-                    gl.uniform2fv(stroke_data.scale_uniform, scale);
-                    gl.uniform2fv(stroke_data.scale2_uniform, stroke_scale);
-                    gl.uniform1f(stroke_data.width_uniform, 0.005);
-                    gl.uniform3fv(stroke_data.color_uniform, [0.271, 0.302, 0.38]);
-
-                    gl.bindBuffer(gl.ARRAY_BUFFER, triangles.gl_outline_normal_buffer);
-                    gl.vertexAttribPointer(stroke_data.normal_attribute, 2, gl.FLOAT, false, 0, 0);
-                    gl.enableVertexAttribArray(stroke_data.normal_attribute);
-
-                    gl.bindBuffer(gl.ARRAY_BUFFER, triangles.gl_outline_position_buffer);
-                    gl.vertexAttribPointer(stroke_data.position_attribute, 2, gl.FLOAT, false, 0, 0);
-                    gl.enableVertexAttribArray(stroke_data.position_attribute);
-
-                    gl.drawArrays(gl.TRIANGLES, 0, triangles.outline_triangles.length / 2);
-
-                    // Draw fill
-                    gl.useProgram(fill_data.shader_program);
-                    gl.uniform2fv(fill_data.translate_uniform, translate);
-                    gl.uniform2fv(fill_data.scale_uniform, scale);
-                    if (loc.id === state.hover) {
-                        gl.uniform3fv(fill_data.color_uniform, loc.color.map(el => el / 255 * 0.8));
-                    } else {
-                        gl.uniform3fv(fill_data.color_uniform, loc.color.map(el => el / 255));
-                    }
-                    gl.bindBuffer(gl.ARRAY_BUFFER, triangles.gl_position_buffer);
-                    gl.vertexAttribPointer(fill_data.position_attribute, 2, gl.FLOAT, false, 0, 0);
-                    gl.enableVertexAttribArray(fill_data.position_attribute);
-
-                    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, triangles.gl_index_buffer);
-                    gl.drawElements(gl.TRIANGLES, triangles.triangles.length, gl.UNSIGNED_SHORT, 0);
+        // Generate location colors
+        const colors = new Uint8Array(locations.length * 4);
+        for (let i = 0; i < locations.length; i++) {
+            for (let j = 0; j < 3; j++) {
+                colors[4*i + j] = locations[i].color[j];
+                if (locations[i].id === state.hover) {
+                    colors[4*i + j] *= 0.8;
                 }
             }
-            translate[0] += 2 * Math.PI;
+            colors[4*i + 3] = 255;
         }
+        gl.bindTexture(gl.TEXTURE_2D, triangles.texture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, locations.length, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, colors);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+        // Draw fill
+        gl.useProgram(fill_data.shader_program);
+        gl.uniform2fv(fill_data.translate_uniform, translate);
+        gl.uniform2fv(fill_data.scale_uniform, scale);
+        gl.uniform1i(fill_data.colors_uniform, 0);
+        
+        gl.bindBuffer(gl.ARRAY_BUFFER, triangles.position_buffer);
+        gl.vertexAttribPointer(fill_data.position_attribute, 2, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(fill_data.position_attribute);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, triangles.color_buffer);
+        gl.vertexAttribPointer(fill_data.color_attribute, 1, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(fill_data.color_attribute);
+
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, triangles.index_buffer);
+        gl.drawElements(gl.TRIANGLES, triangulated.triangles.length, gl.UNSIGNED_INT, 0);
+
+        // Draw stroke
+        gl.useProgram(stroke_data.shader_program);
+        gl.uniform2fv(stroke_data.translate_uniform, translate);
+        gl.uniform2fv(stroke_data.scale_uniform, scale);
+        gl.uniform2fv(stroke_data.scale2_uniform, stroke_scale);
+        gl.uniform1f(stroke_data.width_uniform, 0.0025);
+        gl.uniform3fv(stroke_data.color_uniform, [0.271, 0.302, 0.38]);
+        
+        gl.bindBuffer(gl.ARRAY_BUFFER, triangles.outline_normal_buffer);
+        gl.vertexAttribPointer(stroke_data.normal_attribute, 2, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(stroke_data.normal_attribute);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, triangles.outline_position_buffer);
+        gl.vertexAttribPointer(stroke_data.position_attribute, 2, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(stroke_data.position_attribute);
+
+        gl.drawArrays(gl.TRIANGLES, 0, triangulated.outline_triangles.length / 2);
 
         gl.viewport(0, 0, this.webgl_data.canvas.clientWidth, this.webgl_data.canvas.clientHeight);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     }
 
-    renderMapInContext(locations, location_data, state) {
+    renderMapInContext(locations, triangulated, state) {
         const gl = this.webgl_data.context;
         const earth_data = this.webgl_data.earth_data;
         const [min, max] = this.generateTexMinMax(state);
 
-        this.renderToTexture(locations, location_data, state, min, max);
+        this.renderToTexture(locations, triangulated, state, min, max);
 
         gl.clearColor(0.0, 0.0, 0.0, 0.0);
         gl.clearDepth(1);
         gl.clear(gl.COLOR_BUFFER_BIT);
 
         // Draw globe
+        gl.bindTexture(gl.TEXTURE_2D, this.webgl_data.texture);
         gl.useProgram(earth_data.shader_program);
         gl.uniform2fv(earth_data.scale_uniform, this.generateScale(state));
         gl.uniform2fv(earth_data.scale_uniform, this.generateScale(state));
