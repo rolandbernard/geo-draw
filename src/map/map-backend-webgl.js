@@ -182,94 +182,17 @@ class MapBackendWebGl extends LitElement {
         this.last = null;
     }
 
-    generateTriangles(location) {
-        if (!location.proj_polygons) {
-            location.proj_polygons = [...Array(location.raw.count_polygons()).keys()]
-                .map(i => location.raw.get_proj_polygon(i));
-        }
-        const polygons = [];
-        let vertex_count = 0;
-        let triangle_count = 0;
-        let outline_count = 0;
-        for (const poly of location.proj_polygons) {
-            outline_count += poly.vertex.length / 2;
-            const triangles = poly.triangulate();
-            vertex_count += poly.vertex.length;
-            triangle_count += triangles.length;
-            polygons.push({
-                vertices: poly.vertex,
-                triangles: new Uint16Array(triangles),
-                min: poly.min,
-                max: poly.max,
-            });
-        }
-        const vertices = new Float32Array(vertex_count);
-        const triangles = new Uint16Array(triangle_count);
-        vertex_count = 0;
-        triangle_count = 0;
-        for (const poly of polygons) {
-            vertices.set(poly.vertices, vertex_count);
-            for (let i = 0; i < poly.triangles.length; i++) {
-                triangles[triangle_count + i] = vertex_count / 2 + poly.triangles[i];
-            }
-            vertex_count += poly.vertices.length;
-            triangle_count += poly.triangles.length;
-        }
-        const outline_triangles = new Float32Array(outline_count * 24);
-        const outline_normals = new Float32Array(outline_count * 24);
-        outline_count = 0;
-        for (const poly of location.proj_polygons) {
-            const starts = [0, ...poly.holes, poly.vertex.length / 2];
-            for (let j = 0; j < starts.length - 1; j++) {
-                const part_len = starts[j + 1] - starts[j];
-                for (let i = 0; i < part_len; i++) {
-                    const curr = [poly.vertex[2 * (starts[j] + i)], poly.vertex[2 * (starts[j] + i) + 1]];
-                    const last = [
-                        poly.vertex[2 * (starts[j] + (part_len + i - 1) % part_len)],
-                        poly.vertex[2 * (starts[j] + (part_len + i - 1) % part_len) + 1],
-                    ];
-                    const next = [
-                        poly.vertex[2 * (starts[j] + (i + 1) % part_len)],
-                        poly.vertex[2 * (starts[j] + (i + 1) % part_len) + 1],
-                    ];
-                    const from_last = [curr[0] - last[0], curr[1] - last[1]];
-                    const to_next = [next[0] - curr[0], next[1] - curr[1]];
-                    const offset = outline_count * 24 + i * 24;
-                    outline_triangles.set([
-                        curr[0], curr[1],   curr[0], curr[1],   next[0], next[1], // Line
-                        curr[0], curr[1],   next[0], next[1],   next[0], next[1],
-
-                        curr[0], curr[1],   curr[0], curr[1],   curr[0], curr[1], // Corner
-                        curr[0], curr[1],   curr[0], curr[1],   curr[0], curr[1],
-                    ], offset);
-                    outline_normals.set([
-                        to_next[1], -to_next[0],   -to_next[1], to_next[0],   to_next[1], -to_next[0],
-                        -to_next[1], to_next[0],   -to_next[1], to_next[0],   to_next[1], -to_next[0],
-
-                        -from_last[1], from_last[0], from_last[1], -from_last[0], -to_next[1], to_next[0],
-                        -from_last[1], from_last[0], from_last[1], -from_last[0], to_next[1], -to_next[0],
-                    ], offset)
-                }
-                outline_count += starts[j + 1] - starts[j];
-            }
-        }
-        return {
-            polygons, vertices, triangles, outline_triangles, outline_normals,
-            min: polygons.map(p => p.min).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
-            max: polygons.map(p => p.max).reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
-        };
-    }
-
     buildRenderData() {
-        this.triangulated = TriangulatedData.new();
-        for (const loc of this.locations) {
-            if (loc) {
+        if (!this.triangulated) {
+            this.triangulated = TriangulatedData.new();
+            for (const loc of this.locations) {
                 this.triangulated.add_location(loc.raw);
             }
+            this.triangulated.triangulate(true);
+            this.triangulated.generate_outlines(true);
+            this.state.min = this.triangulated.min;
+            this.state.max = this.triangulated.max;
         }
-        this.triangulated.triangulate(true);
-        this.state.min = this.triangulated.min;
-        this.state.max = this.triangulated.max;
     }
 
     render() {

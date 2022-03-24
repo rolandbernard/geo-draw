@@ -208,6 +208,8 @@ pub struct TriangulatedData {
     color: Vec<f32>,
     triangles: Vec<u32>,
     polygons: Vec<u32>,
+    outline_triangles: Vec<f32>,
+    outline_normals: Vec<f32>,
     min: Point,
     max: Point,
 }
@@ -235,6 +237,16 @@ impl TriangulatedData {
     }
 
     #[wasm_bindgen(getter)]
+    pub fn outline_triangles(&self) -> Float32Array {
+        unsafe { Float32Array::view(&self.outline_triangles) }
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn outline_normals(&self) -> Float32Array {
+        unsafe { Float32Array::view(&self.outline_normals) }
+    }
+
+    #[wasm_bindgen(getter)]
     pub fn min(&self) -> Vec<f32> {
         self.min.to_vec()
     }
@@ -249,6 +261,7 @@ impl TriangulatedData {
         TriangulatedData {
             locs: Vec::new(), vertex: Vec::new(), color: Vec::new(),
             triangles: Vec::new(), polygons: Vec::new(),
+            outline_triangles: Vec::new(), outline_normals: Vec::new(),
             min: [f32::MAX, f32::MAX], max: [f32::MIN, f32::MIN],
         }
     }
@@ -279,6 +292,48 @@ impl TriangulatedData {
                 self.min[1] = self.min[1].min(poly.min[1]);
                 self.max[0] = self.max[0].max(poly.max[0]);
                 self.max[1] = self.max[1].max(poly.max[1]);
+            }
+        }
+    }
+
+    pub fn generate_outlines(&mut self, proj: bool) {
+        for &loc in &self.locs {
+            let polys = unsafe {
+                if proj { &(*loc).proj_polygons } else { &(*loc).polygons }
+            };
+            for poly in polys {
+                for j in 0..poly.holes.len() + 1 {
+                    let start = if j == 0 { 0 } else { poly.holes[j - 1] as usize };
+                    let end = if j == poly.holes.len() { poly.vertex.len() / 2 } else { poly.holes[j] as usize };
+                    let part_len = end - start;
+                    for i in 0..part_len {
+                        let curr = (poly.vertex[2 * (start + i)], poly.vertex[2 * (start + i) + 1]);
+                        let last = (
+                            poly.vertex[2 * (start + (part_len + i - 1) % part_len)],
+                            poly.vertex[2 * (start + (part_len + i - 1) % part_len) + 1],
+                        );
+                        let next = (
+                            poly.vertex[2 * (start + (i + 1) % part_len)],
+                            poly.vertex[2 * (start + (i + 1) % part_len) + 1],
+                        );
+                        let from_last = (curr.0 - last.0, curr.1 - last.1);
+                        let to_next = (next.0 - curr.0, next.1 - curr.1);
+                        self.outline_triangles.extend([
+                            curr.0, curr.1,   curr.0, curr.1,   next.0, next.1, // Line
+                            curr.0, curr.1,   next.0, next.1,   next.0, next.1,
+
+                            curr.0, curr.1,   curr.0, curr.1,   curr.0, curr.1, // Corner
+                            curr.0, curr.1,   curr.0, curr.1,   curr.0, curr.1,
+                        ]);
+                        self.outline_normals.extend([
+                            to_next.1, -to_next.0,   -to_next.1, to_next.0,   to_next.1, -to_next.0,
+                            -to_next.1, to_next.0,   -to_next.1, to_next.0,   to_next.1, -to_next.0,
+
+                            -from_last.1, from_last.0, from_last.1, -from_last.0, -to_next.1, to_next.0,
+                            -from_last.1, from_last.0, from_last.1, -from_last.0, to_next.1, -to_next.0,
+                        ])
+                    }
+                }
             }
         }
     }
