@@ -207,7 +207,7 @@ pub struct TriangulatedData {
     vertex: Vec<f32>,
     color: Vec<f32>,
     triangles: Vec<u32>,
-    polygons: Vec<u32>,
+    polygons: Vec<usize>,
     outline_triangles: Vec<f32>,
     outline_normals: Vec<f32>,
     min: Point,
@@ -229,11 +229,6 @@ impl TriangulatedData {
     #[wasm_bindgen(getter)]
     pub fn triangles(&self) -> Uint32Array {
         unsafe { Uint32Array::view(&self.triangles) }
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn polygons(&self) -> Uint32Array {
-        unsafe { Uint32Array::view(&self.polygons) }
     }
 
     #[wasm_bindgen(getter)]
@@ -284,7 +279,7 @@ impl TriangulatedData {
                     self.triangles[j] += (self.vertex.len() / 2) as u32;
                 }
                 self.vertex.extend(&poly.vertex);
-                self.polygons.push(old as u32);
+                self.polygons.push(old);
                 for _ in 0..poly.vertex.len() / 2 {
                     self.color.push((i as f32 + 0.5) / self.locs.len() as f32);
                 }
@@ -336,6 +331,59 @@ impl TriangulatedData {
                 }
             }
         }
+    }
+
+    #[wasm_bindgen]
+    pub fn get_intersection(&self, pos: Vec<f32>, proj: bool) -> Option<usize> {
+        let mut poly_i = 0;
+        for (l, &loc) in self.locs.iter().enumerate() {
+            let (min, max, polys) = unsafe {
+                if proj {
+                    (&(*loc).proj_min, &(*loc).proj_max, &(*loc).proj_polygons)
+                } else {
+                    (&(*loc).min, &(*loc).max, &(*loc).polygons)
+                }
+            };
+            if pos[0] >= min[0] && pos[1] >= min[1] && pos[0] <= max[0] && pos[1] <= max[1] {
+                for poly in polys {
+                    let min = poly.min;
+                    let max = poly.max;
+                    if pos[0] >= min[0] && pos[1] >= min[1] && pos[0] <= max[0] && pos[1] <= max[1] {
+                        let start = self.polygons[poly_i];
+                        let end = if poly_i + 1 < self.polygons.len() { self.polygons[poly_i + 1] } else { self.triangles.len() };
+                        for j in (start..end).step_by(3) {
+                            let v1 = [
+                                self.vertex[2 * self.triangles[j] as usize],
+                                self.vertex[2 * self.triangles[j] as usize + 1]
+                            ];
+                            let v2 = [
+                                self.vertex[2 * self.triangles[j + 1] as usize],
+                                self.vertex[2 * self.triangles[j + 1] as usize + 1]
+                            ];
+                            let v3 = [
+                                self.vertex[2 * self.triangles[j + 2] as usize],
+                                self.vertex[2 * self.triangles[j + 2] as usize + 1]
+                            ];
+                            fn sign(p1: &Vec<f32>, p2: &Point, p3: &Point) -> f32 {
+                                return (p1[0] - p3[0]) * (p2[1] - p3[1]) - (p2[0] - p3[0]) * (p1[1] - p3[1]);
+                            }
+                            let d1 = sign(&pos, &v1, &v2);
+                            let d2 = sign(&pos, &v2, &v3);
+                            let d3 = sign(&pos, &v3, &v1);
+                            let has_neg = (d1 < 0.0) || (d2 < 0.0) || (d3 < 0.0);
+                            let has_pos = (d1 > 0.0) || (d2 > 0.0) || (d3 > 0.0);
+                            if !(has_neg && has_pos) {
+                                return Some(l);
+                            }
+                        }
+                    }
+                    poly_i += 1;
+                }
+            } else {
+                poly_i += polys.len();
+            }
+        }
+        return None;
     }
 }
 
