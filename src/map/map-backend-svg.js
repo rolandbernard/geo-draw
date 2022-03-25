@@ -3,7 +3,6 @@ import { LitElement, html, svg, css } from 'lit';
 import { styleMap } from 'lit/directives/style-map.js';
 
 import { map } from '../util';
-import MapRenderer from './map-renderer';
 
 class MapBackendSvg extends LitElement {
 
