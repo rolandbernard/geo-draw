@@ -82,52 +82,24 @@ class MapBackendWebGl extends LitElement {
     }
 
     handleMouseMove(event) {
-        // const pos = this.clientPosToProjPos([event.clientX, event.clientY]);
-        // for(const loc of this.locations) {
-        //     const triangles = this.location_data[loc.id];
-        //     if(triangles.min[0] <= pos[0] && triangles.min[1] <= pos[1] &&
-        //         triangles.max[0] >= pos[0] && triangles.max[1] >= pos[1]) {
-        //         for(const polygon of triangles.polygons) {
-        //             if(polygon.min[0] <= pos[0] && polygon.min[1] <= pos[1] &&
-        //                 polygon.max[0] >= pos[0] && polygon.max[1] >= pos[1]) {
-        //                 for(let i = 0; i < polygon.triangles.length; i += 3) {
-        //                     const v1 = [
-        //                         polygon.vertices[2 * polygon.triangles[i]],
-        //                         polygon.vertices[2 * polygon.triangles[i] + 1]
-        //                     ];
-        //                     const v2 = [
-        //                         polygon.vertices[2 * polygon.triangles[i + 1]],
-        //                         polygon.vertices[2 * polygon.triangles[i + 1] + 1]
-        //                     ];
-        //                     const v3 = [
-        //                         polygon.vertices[2 * polygon.triangles[i + 2]],
-        //                         polygon.vertices[2 * polygon.triangles[i + 2] + 1]
-        //                     ];
-        //                     function sign(p1, p2, p3) {
-        //                         return (p1[0] - p3[0]) * (p2[1] - p3[1]) - (p2[0] - p3[0]) * (p1[1] - p3[1]);
-        //                     }
-        //                     const d1 = sign(pos, v1, v2);
-        //                     const d2 = sign(pos, v2, v3);
-        //                     const d3 = sign(pos, v3, v1);
-        //                     const has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
-        //                     const has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
-        //                     if(!(has_neg && has_pos)) {
-        //                         this.state.hover = loc.id;
-        //                         const my_event = new Event('hover');
-        //                         my_event.location = loc;
-        //                         my_event.position = this.projPosToClientPos([
-        //                             (polygon.min[0] + polygon.max[0]) / 2,
-        //                             (polygon.min[1] + polygon.max[1]) / 2
-        //                         ]);
-        //                         this.dispatchEvent(my_event);
-        //                         return;
-        //                     }
-        //                 }
-        //             }
-        //         }
-        //     }
-        // }
-        // this.handleMouseOut();
+        const pos = this.clientPosToProjPos([event.clientX, event.clientY]);
+        const inter = this.triangulated?.get_intersection(pos, this.renderer.project());
+        if (inter) {
+            const loc = this.locations[inter[0]];
+            const polygon = this.renderer.project()
+                ? loc.raw.get_proj_polygon(inter[1])
+                : loc.raw.get_polygon(inter[1]);
+            this.state.hover = loc.id;
+            const my_event = new Event('hover');
+            my_event.location = loc;
+            my_event.position = this.projPosToClientPos([
+                (polygon.min[0] + polygon.max[0]) / 2,
+                (polygon.min[1] + polygon.max[1]) / 2
+            ]);
+            this.dispatchEvent(my_event);
+        } else {
+            this.handleMouseOut();
+        }
     }
 
     handleMouseOut() {

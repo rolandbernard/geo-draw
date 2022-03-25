@@ -334,7 +334,7 @@ impl TriangulatedData {
     }
 
     #[wasm_bindgen]
-    pub fn get_intersection(&self, pos: Vec<f32>, proj: bool) -> Option<usize> {
+    pub fn get_intersection(&self, pos: Vec<f32>, proj: bool) -> Option<Vec<usize>> {
         let mut poly_i = 0;
         for (l, &loc) in self.locs.iter().enumerate() {
             let (min, max, polys) = unsafe {
@@ -345,7 +345,7 @@ impl TriangulatedData {
                 }
             };
             if pos[0] >= min[0] && pos[1] >= min[1] && pos[0] <= max[0] && pos[1] <= max[1] {
-                for poly in polys {
+                for (p, poly) in polys.iter().enumerate() {
                     let min = poly.min;
                     let max = poly.max;
                     if pos[0] >= min[0] && pos[1] >= min[1] && pos[0] <= max[0] && pos[1] <= max[1] {
@@ -373,7 +373,7 @@ impl TriangulatedData {
                             let has_neg = (d1 < 0.0) || (d2 < 0.0) || (d3 < 0.0);
                             let has_pos = (d1 > 0.0) || (d2 > 0.0) || (d3 > 0.0);
                             if !(has_neg && has_pos) {
-                                return Some(l);
+                                return Some(vec![l, p]);
                             }
                         }
                     }
