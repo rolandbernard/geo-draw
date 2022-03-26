@@ -96,8 +96,12 @@ fn remove_node(nodes: &mut [Node], node: usize) {
     nodes[next].prev = prev;
     let zprev = nodes[node].zprev;
     let znext = nodes[node].znext;
-    nodes[zprev].znext = znext;
-    nodes[znext].zprev = zprev;
+    if zprev != usize::MAX {
+        nodes[zprev].znext = znext;
+    }
+    if znext != usize::MAX {
+        nodes[znext].zprev = zprev;
+    }
 }
 
 fn create_list(nodes: &mut [Node], from: usize, to: usize, rev: bool) {
@@ -385,8 +389,8 @@ fn generate_z_index(nodes: &mut [Node], outer: usize, min: [f32; 2], inv_size: f
     }
     ordered.sort_by_key(|&i| nodes[i].z);
     for i in 0..ordered.len() {
-        nodes[ordered[i]].next = ordered[(i + 1) % ordered.len()]; 
-        nodes[ordered[i]].prev = ordered[(ordered.len() + i - 1) % ordered.len()]; 
+        nodes[ordered[i]].znext = if i + 1 < ordered.len() { ordered[i + 1] } else { usize::MAX }; 
+        nodes[ordered[i]].zprev = if i != 0 { ordered[i - 1] } else { usize::MAX }; 
     }
 }
 
@@ -419,8 +423,8 @@ fn is_ear_z_index(nodes: &[Node], node: usize, min: [f32; 2], inv_size: f32) -> 
     let max_z = z_order(max_t, min, inv_size);
     let mut p = nodes[node].zprev;
     let mut n = nodes[node].znext;
-    while p != n && (nodes[p].z >= min_z || nodes[n].z <= max_z) {
-        if nodes[p].z >= min_z {
+    while (p != usize::MAX && nodes[p].z >= min_z) || (n != usize::MAX && nodes[n].z <= max_z) {
+        if p != usize::MAX && nodes[p].z >= min_z {
             if p != prev && p != next && point_in_triangle(a, b, c, &nodes[p]) {
                 let pprev = nodes[p].prev;
                 let pnext = nodes[p].next;
@@ -430,7 +434,7 @@ fn is_ear_z_index(nodes: &[Node], node: usize, min: [f32; 2], inv_size: f32) -> 
             }
             p = nodes[p].zprev;
         }
-        if p != n && nodes[n].z <= max_z {
+        if n != usize::MAX && nodes[n].z <= max_z {
             if n != prev && n != next && point_in_triangle(a, b, c, &nodes[n]) {
                 let nprev = nodes[n].prev;
                 let nnext = nodes[n].next;
