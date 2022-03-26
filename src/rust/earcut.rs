@@ -11,12 +11,6 @@ impl PartialEq for Node {
     }
 }
 
-pub fn triangulate(vertex: &[f32], holes: &[u32], min: [f32; 2], max: [f32; 2]) -> Vec<u32> {
-    let mut triangles = Vec::with_capacity(3 * (vertex.len() / 2 + 2 * holes.len()));
-    triangulate_into(&mut triangles, vertex, holes, min, max);
-    return triangles;
-}
-
 pub fn triangulate_into(triangles: &mut Vec<u32>, vertex: &[f32], holes: &[u32], _min: [f32; 2], _max: [f32; 2]) {
     let node_len = vertex.len() / 2;
     let mut nodes = Vec::with_capacity(node_len + 2 * holes.len());

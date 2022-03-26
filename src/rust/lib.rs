@@ -8,8 +8,6 @@ mod earcut;
 
 type Point = [f32; 2];
 
-#[wasm_bindgen]
-#[derive(Clone)]
 pub struct Polygon {
     vertex: Vec<f32>,
     holes: Vec<u32>,
@@ -20,34 +18,6 @@ pub struct Polygon {
 impl Polygon {
     pub fn triangulate_into(&self, triangles: &mut Vec<u32>) {
         earcut::triangulate_into(triangles, &self.vertex, &self.holes, self.min, self.max);
-    }
-}
-
-#[wasm_bindgen]
-impl Polygon {
-    #[wasm_bindgen(getter)]
-    pub fn vertex(&self) -> Float32Array {
-        unsafe { Float32Array::view(&self.vertex) }
-    }
-    
-    #[wasm_bindgen(getter)]
-    pub fn holes(&self) -> Uint32Array {
-        unsafe { Uint32Array::view(&self.holes) }
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn min(&self) -> Vec<f32> {
-        self.min.to_vec()
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn max(&self) -> Vec<f32> {
-        self.max.to_vec()
-    }
-
-    #[wasm_bindgen]
-    pub fn triangulate(&self) -> Vec<u32> {
-        earcut::triangulate(&self.vertex, &self.holes, self.min, self.max)
     }
 
     fn projected(&self) -> Polygon {
@@ -73,6 +43,40 @@ impl Polygon {
             poly.max[1] = poly.max[1].max(proj[1]);
         }
         return poly;
+    }
+}
+
+#[wasm_bindgen]
+pub struct PolygonView {
+    poly: *const Polygon,
+}
+
+impl PolygonView {
+    fn new(poly: &Polygon) -> PolygonView {
+        PolygonView { poly }
+    }
+}
+
+#[wasm_bindgen]
+impl PolygonView {
+    #[wasm_bindgen(getter)]
+    pub fn vertex(&self) -> Float32Array {
+        unsafe { Float32Array::view(&(*self.poly).vertex) }
+    }
+    
+    #[wasm_bindgen(getter)]
+    pub fn holes(&self) -> Uint32Array {
+        unsafe { Uint32Array::view(&(*self.poly).holes) }
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn min(&self) -> Vec<f32> {
+        unsafe { (*self.poly).min.to_vec() }
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn max(&self) -> Vec<f32> {
+        unsafe { (*self.poly).max.to_vec() }
     }
 }
 
@@ -110,13 +114,13 @@ impl LocationData {
     }
 
     #[wasm_bindgen]
-    pub fn get_polygon(&self, i: usize) -> Polygon {
-        self.polygons[i].clone()
+    pub fn get_polygon(&self, i: usize) -> PolygonView {
+        PolygonView::new(&self.polygons[i])
     }
 
     #[wasm_bindgen]
-    pub fn get_proj_polygon(&mut self, i: usize) -> Polygon {
-        self.proj_polygons[i].clone()
+    pub fn get_proj_polygon(&mut self, i: usize) -> PolygonView {
+        PolygonView::new(&self.proj_polygons[i])
     }
 
     #[wasm_bindgen(getter)]
