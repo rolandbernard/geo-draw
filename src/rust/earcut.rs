@@ -1,18 +1,18 @@
 
 #[derive(Clone)]
 struct Node {
-    i: usize, x: f32, y: f32, 
+    i: usize, x: f32, y: f32, hole: bool,
     next: usize, prev: usize,
     z: u32, znext: usize, zprev: usize,
 }
 
 impl Node {
-    fn new(i: usize, x: f32, y: f32, next: usize, prev: usize) -> Node {
-        Node { i, x, y, next, prev, z: 0, znext: 0, zprev: 0 }
+    fn new(i: usize, x: f32, y: f32, hole: bool, next: usize, prev: usize) -> Node {
+        Node { i, x, y, hole, next, prev, z: 0, znext: 0, zprev: 0 }
     }
 
     fn dummy(x: f32, y: f32) -> Node {
-        Self::new(0, x, y, 0, 0)
+        Self::new(0, x, y, false, 0, 0)
     }
 }
 
@@ -24,14 +24,14 @@ impl PartialEq for Node {
 
 pub fn triangulate_into(triangles: &mut Vec<u32>, vertex: &[f32], holes: &[u32], min: [f32; 2], max: [f32; 2]) {
     let node_len = vertex.len() / 2;
+    let outer_len = if holes.len() > 0 { holes[0] as usize } else { node_len as usize };
     let mut nodes = Vec::with_capacity(node_len + 2 * holes.len());
     for i in 0..node_len {
         nodes.push(Node::new(
-            i, vertex[2*i], vertex[2*i + 1],
+            i, vertex[2*i], vertex[2*i + 1], i >= outer_len,
             (i + 1) % node_len, (node_len + i - 1) % node_len
         ));
     }
-    let outer_len = if holes.len() > 0 { holes[0] as usize } else { node_len as usize };
     create_list(&mut nodes, 0, outer_len, false);
     if holes.len() > 0 {
         eliminate_holes(&mut nodes, holes, 0);
@@ -324,26 +324,37 @@ fn apply_earcut(nodes: &mut Vec<Node>, head: usize, triangles: &mut Vec<u32>, mi
     while nodes[cur].prev != nodes[cur].next && pass < 3 {
         if pass < 2 {
             cur = filter_points(nodes, cur);
-        } else if pass < 3 {
+        } else {
             cur = filter_points(nodes, cur);
             cur = resolve_intersections(nodes, cur, triangles);
             cur = filter_points(nodes, cur);
         }
         let mut stop = cur;
+        let mut fallback = false;
         while nodes[cur].prev != nodes[cur].next {
             let prev = nodes[cur].prev;
             let next = nodes[cur].next;
-            if if inv_size.is_nan() { is_ear(nodes, cur) } else { is_ear_z_index(nodes, cur, min, inv_size) } {
+            let ear = if inv_size.is_nan() {
+                is_ear(nodes, cur, fallback)
+            } else {
+                is_ear_z_index(nodes, cur, fallback, min, inv_size)
+            };
+            if ear {
                 triangles.push(nodes[prev].i as u32);
                 triangles.push(nodes[cur].i as u32);
                 triangles.push(nodes[next].i as u32);
                 remove_node(nodes, cur);
                 cur = nodes[next].next;
                 stop = cur;
+                fallback = false;
             } else {
                 cur = next;
                 if cur == stop {
-                    break;
+                    if pass < 2 || fallback {
+                        break;
+                    } else {
+                        fallback = true;
+                    }
                 }
             }
         }
@@ -354,7 +365,7 @@ fn apply_earcut(nodes: &mut Vec<Node>, head: usize, triangles: &mut Vec<u32>, mi
     }
 }
 
-fn is_ear(nodes: &[Node], node: usize) -> bool {
+fn is_ear(nodes: &[Node], node: usize, fallback: bool) -> bool {
     let a = &nodes[nodes[node].prev];
     let b = &nodes[node];
     let c = &nodes[nodes[node].next];
@@ -365,8 +376,10 @@ fn is_ear(nodes: &[Node], node: usize) -> bool {
     loop {
         let prev = nodes[cur].prev;
         let next = nodes[cur].next;
-        if point_in_triangle(a, b, c, &nodes[cur]) && tri_area(&nodes[prev], &nodes[cur], &nodes[next]) >= 0.0 {
-            return false;
+        if !fallback || !nodes[cur].hole || nodes[node].hole {
+            if point_in_triangle(a, b, c, &nodes[cur]) && tri_area(&nodes[prev], &nodes[cur], &nodes[next]) >= 0.0 {
+                return false;
+            }
         }
         cur = next;
         if cur == nodes[node].prev {
@@ -408,7 +421,7 @@ fn z_order(pos: [f32; 2], min: [f32; 2], inv_size: f32) -> u32 {
     return x | (y << 1);
 }
 
-fn is_ear_z_index(nodes: &[Node], node: usize, min: [f32; 2], inv_size: f32) -> bool {
+fn is_ear_z_index(nodes: &[Node], node: usize, fallback: bool, min: [f32; 2], inv_size: f32) -> bool {
     let prev = nodes[node].prev;
     let next = nodes[node].next;
     let a = &nodes[prev];
@@ -425,21 +438,25 @@ fn is_ear_z_index(nodes: &[Node], node: usize, min: [f32; 2], inv_size: f32) -> 
     let mut n = nodes[node].znext;
     while (p != usize::MAX && nodes[p].z >= min_z) || (n != usize::MAX && nodes[n].z <= max_z) {
         if p != usize::MAX && nodes[p].z >= min_z {
-            if p != prev && p != next && point_in_triangle(a, b, c, &nodes[p]) {
-                let pprev = nodes[p].prev;
-                let pnext = nodes[p].next;
-                if tri_area(&nodes[pprev], &nodes[p], &nodes[pnext]) >= 0.0 {
-                    return false;
+            if !fallback || !nodes[p].hole || nodes[node].hole {
+                if p != prev && p != next && point_in_triangle(a, b, c, &nodes[p]) {
+                    let pprev = nodes[p].prev;
+                    let pnext = nodes[p].next;
+                    if tri_area(&nodes[pprev], &nodes[p], &nodes[pnext]) >= 0.0 {
+                        return false;
+                    }
                 }
             }
             p = nodes[p].zprev;
         }
         if n != usize::MAX && nodes[n].z <= max_z {
-            if n != prev && n != next && point_in_triangle(a, b, c, &nodes[n]) {
-                let nprev = nodes[n].prev;
-                let nnext = nodes[n].next;
-                if tri_area(&nodes[nprev], &nodes[n], &nodes[nnext]) >= 0.0 {
-                    return false;
+            if !fallback || !nodes[n].hole || nodes[node].hole {
+                if n != prev && n != next && point_in_triangle(a, b, c, &nodes[n]) {
+                    let nprev = nodes[n].prev;
+                    let nnext = nodes[n].next;
+                    if tri_area(&nodes[nprev], &nodes[n], &nodes[nnext]) >= 0.0 {
+                        return false;
+                    }
                 }
             }
             n = nodes[n].znext;
