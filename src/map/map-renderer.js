@@ -328,20 +328,22 @@ export default class MapRenderer extends LitElement {
 
     handleScroll(event) {
         event.preventDefault();
-        const map = this.shadowRoot.getElementById('map-backend');
-        let new_scale = map.scale;
-        if (event.deltaY < 0) {
-            new_scale *= mapFromTo(event.deltaY, 0, -10, 1.1, 1.5);
-        } else {
-            new_scale *= mapFromTo(event.deltaY, 0, 10, 0.6, 0.9);
+        if (event.deltaY != 0) {
+            const map = this.shadowRoot.getElementById('map-backend');
+            let new_scale = map.scale;
+            if (event.deltaY < 0) {
+                new_scale *= Math.pow(1.001, -event.deltaY);
+            } else {
+                new_scale *= Math.pow(0.999, event.deltaY);
+            }
+            new_scale = Math.min(Math.max(MIN_ZOOM, new_scale), MAX_ZOOM);
+            const ds = new_scale / map.scale;
+            const center = map.center;
+            const pointer = map.clientPosToMapPos([event.clientX, event.clientY]);
+            const delta = [(pointer[0] - center[0]) * (1 - 1 / ds), (pointer[1] - center[1]) * (1 - 1 / ds)];
+            const new_center = [center[0] + delta[0], center[1] + delta[1]];
+            map.setCenterAndScale(new_center, new_scale);
         }
-        new_scale = Math.min(Math.max(MIN_ZOOM, new_scale), MAX_ZOOM);
-        const ds = new_scale / map.scale;
-        const center = map.center;
-        const pointer = map.clientPosToMapPos([event.clientX, event.clientY]);
-        const delta = [(pointer[0] - center[0]) * (1 - 1 / ds), (pointer[1] - center[1]) * (1 - 1 / ds)];
-        const new_center = [center[0] + delta[0], center[1] + delta[1]];
-        map.setCenterAndScale(new_center, new_scale);
     }
 
     handleDragStart(event) {
