@@ -37,7 +37,7 @@ pub fn triangulate_into(triangles: &mut Vec<u32>, vertex: &[f32], holes: &[u32],
         eliminate_holes(&mut nodes, holes, 0);
     }
     if node_len > 80 {
-        let mut inv_size = f32::max(max[0] - min[0], max[1] - min[0]);
+        let mut inv_size = f32::max(max[0] - min[0], max[1] - min[1]);
         inv_size = if inv_size != 0.0 { 1.0 / inv_size } else { 0.0 };
         generate_z_index(&mut nodes, 0, min, inv_size);
         apply_earcut(&mut nodes, 0, triangles, min, inv_size);
