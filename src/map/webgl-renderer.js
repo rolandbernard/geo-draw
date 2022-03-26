@@ -113,6 +113,12 @@ export default class WebGLRenderer {
         const stroke_color_uniform = gl.getUniformLocation(stroke_shader_program, 'uStrokeColor');
 
         const texture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAX_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
         const position_buffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, position_buffer);
         gl.bufferData(gl.ARRAY_BUFFER, triangulated.vertex, gl.STATIC_DRAW);
@@ -201,9 +207,6 @@ export default class WebGLRenderer {
         }
         gl.bindTexture(gl.TEXTURE_2D, triangles.texture);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, locations.length, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, colors);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
         // Draw fill
         gl.useProgram(fill_data.shader_program);
