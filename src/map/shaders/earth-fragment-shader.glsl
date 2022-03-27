@@ -98,10 +98,10 @@ void main() {
     if (dist >= 1.0) {
         gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0);
     }
-    float f = 0.75 * exp(-1.0e4 * edge);
+    float f = 0.5 * exp(-1.0e4 * edge);
     gl_FragColor = (1.0 - f) * gl_FragColor + f * vec4(0.5, 0.75, 1.0, 1.0);
     if (dist < 1.0) {
-        float f = 0.2 * exp(-1.0 / (2.0 - pos.z) * uScaleZ) + 0.2 * (1.0 - pos.z);
+        float f = 0.1 * exp(-1.0 / (2.0 - pos.z) * uScaleZ) + 0.2 * (1.0 - pos.z);
         gl_FragColor = (1.0 - f) * gl_FragColor + f * vec4(0.0, 0.75, 1.0, 1.0);
     }
     gl_FragColor.xyz = computeLight(pos, water) * gl_FragColor.xyz;

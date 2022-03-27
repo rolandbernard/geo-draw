@@ -1,0 +1,21 @@
+[package]
+name = "geo-draw"
+version = "0.1.0"
+readme = "README.md"
+edition = "2021"
+
+[lib]
+path = "src/rust/lib.rs"
+crate-type = ["cdylib"]
+
+[profile.release]
+lto = true
+
+[dependencies]
+js-sys = "0.3.56"
+wasm-bindgen = "0.2.45"
+
+[dependencies.web-sys]
+version = "0.3.22"
+features = [ "console" ]
+

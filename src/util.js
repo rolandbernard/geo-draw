@@ -15,7 +15,7 @@ export function hasWebGlSupport() {
     try {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-        return ctx;
+        return ctx && ctx.getExtension("OES_element_index_uint");
     } catch (e) {
         return false;
     }

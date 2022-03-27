@@ -1,9 +1,10 @@
 
 import { LitElement, html, css } from 'lit';
-import earcut from 'earcut';
 
 import WebGLRenderer from './webgl-renderer';
 import WebGLRenderer3d from './webgl-renderer-3d';
+
+import { TriangulatedData } from '../../pkg/index'
 
 class MapBackendWebGl extends LitElement {
 
@@ -38,7 +39,6 @@ class MapBackendWebGl extends LitElement {
 
     constructor() {
         super();
-        this.location_data = {};
         this.renderer = this.newRenderer();
         this.state = {
             center: [0, 0],
@@ -83,51 +83,23 @@ class MapBackendWebGl extends LitElement {
 
     handleMouseMove(event) {
         const pos = this.clientPosToProjPos([event.clientX, event.clientY]);
-        for(const loc of this.locations) {
-            const triangles = this.location_data[loc.id];
-            if(triangles.min[0] <= pos[0] && triangles.min[1] <= pos[1] &&
-                triangles.max[0] >= pos[0] && triangles.max[1] >= pos[1]) {
-                for(const polygon of triangles.polygons) {
-                    if(polygon.min[0] <= pos[0] && polygon.min[1] <= pos[1] &&
-                        polygon.max[0] >= pos[0] && polygon.max[1] >= pos[1]) {
-                        for(let i = 0; i < polygon.triangles.length; i += 3) {
-                            const v1 = [
-                                polygon.vertices[2 * polygon.triangles[i]],
-                                polygon.vertices[2 * polygon.triangles[i] + 1]
-                            ];
-                            const v2 = [
-                                polygon.vertices[2 * polygon.triangles[i + 1]],
-                                polygon.vertices[2 * polygon.triangles[i + 1] + 1]
-                            ];
-                            const v3 = [
-                                polygon.vertices[2 * polygon.triangles[i + 2]],
-                                polygon.vertices[2 * polygon.triangles[i + 2] + 1]
-                            ];
-                            function sign(p1, p2, p3) {
-                                return (p1[0] - p3[0]) * (p2[1] - p3[1]) - (p2[0] - p3[0]) * (p1[1] - p3[1]);
-                            }
-                            const d1 = sign(pos, v1, v2);
-                            const d2 = sign(pos, v2, v3);
-                            const d3 = sign(pos, v3, v1);
-                            const has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
-                            const has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
-                            if(!(has_neg && has_pos)) {
-                                this.state.hover = loc.id;
-                                const my_event = new Event('hover');
-                                my_event.location = loc;
-                                my_event.position = this.projPosToClientPos([
-                                    (polygon.min[0] + polygon.max[0]) / 2,
-                                    (polygon.min[1] + polygon.max[1]) / 2
-                                ]);
-                                this.dispatchEvent(my_event);
-                                return;
-                            }
-                        }
-                    }
-                }
-            }
+        const inter = this.triangulated?.get_intersection(pos, this.renderer.project());
+        if (inter) {
+            const loc = this.locations[inter[0]];
+            const polygon = this.renderer.project()
+                ? loc.raw.get_proj_polygon(inter[1])
+                : loc.raw.get_polygon(inter[1]);
+            this.state.hover = loc.id;
+            const my_event = new Event('hover');
+            my_event.location = loc;
+            my_event.position = this.projPosToClientPos([
+                (polygon.min[0] + polygon.max[0]) / 2,
+                (polygon.min[1] + polygon.max[1]) / 2
+            ]);
+            this.dispatchEvent(my_event);
+        } else {
+            this.handleMouseOut();
         }
-        this.handleMouseOut();
     }
 
     handleMouseOut() {
@@ -156,7 +128,7 @@ class MapBackendWebGl extends LitElement {
             || this.last.hover != this.state.hover
             || this.last.size != this.state.size
         ) {
-            this.renderer.renderMapInContext(this.locations, this.location_data, this.state)
+            this.renderer.renderMapInContext(this.locations, this.triangulated, this.state)
             this.last = { ...this.state };
         }
         window.requestAnimationFrame(this.renderMapInCanvas.bind(this));
@@ -166,7 +138,7 @@ class MapBackendWebGl extends LitElement {
         const canvas = this.shadowRoot.getElementById('map');
         if (this.last_canvas != canvas) {
             this.last_canvas = canvas;
-            this.renderer.deinitResources(this.locations, this.location_data);
+            this.renderer.deinitResources(this.locations, this.triangulated);
             const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
             const handleResize = () => {
                 canvas.width = canvas.clientWidth;
@@ -176,98 +148,23 @@ class MapBackendWebGl extends LitElement {
             }
             window.addEventListener('resize', handleResize);
             handleResize();
-            this.renderer.initForContext(canvas, gl, this.locations, this.location_data);
+            this.renderer.initForContext(canvas, gl, this.locations, this.triangulated);
             this.renderMapInCanvas();
         }
         this.last = null;
     }
 
-    generateTriangles(location) {
-        const polygons = [];
-        let vertex_count = 0;
-        let triangle_count = 0;
-        let outline_count = 0;
-        for (const poly of location.coords) {
-            for (const part of poly) {
-                outline_count += part.length;
-            }
-            const data = earcut.flatten(poly);
-            this.renderer.applyProjection(data.vertices);
-            const triangles = earcut(data.vertices, data.holes, data.dimensions);
-            vertex_count += data.vertices.length;
-            triangle_count += triangles.length;
-            polygons.push({
-                vertices: new Float32Array(data.vertices),
-                triangles: new Uint16Array(triangles),
-                min: poly.flat().map(this.renderer.projection)
-                    .reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
-                max: poly.flat().map(this.renderer.projection)
-                    .reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
-            });
-        }
-        const vertices = new Float32Array(vertex_count);
-        const triangles = new Uint16Array(triangle_count);
-        vertex_count = 0;
-        triangle_count = 0;
-        for (const poly of polygons) {
-            vertices.set(poly.vertices, vertex_count);
-            for (let i = 0; i < poly.triangles.length; i++) {
-                triangles[triangle_count + i] = vertex_count / 2 + poly.triangles[i];
-            }
-            vertex_count += poly.vertices.length;
-            triangle_count += poly.triangles.length;
-        }
-        const outline_triangles = new Float32Array(outline_count * 24);
-        const outline_normals = new Float32Array(outline_count * 24);
-        outline_count = 0;
-        for (const poly of location.coords) {
-            for (const raw_part of poly) {
-                const part = raw_part.map(this.renderer.projection)
-                for (let i = 0; i < part.length; i++) {
-                    const curr = part[i];
-                    const last = part[(part.length + i - 1) % part.length];
-                    const next = part[(i + 1) % part.length];
-                    const from_last = [curr[0] - last[0], curr[1] - last[1]];
-                    const to_next = [next[0] - curr[0], next[1] - curr[1]];
-                    const offset = outline_count * 24 + i * 24;
-                    outline_triangles.set([
-                        curr[0], curr[1],   curr[0], curr[1],   next[0], next[1], // Line
-                        curr[0], curr[1],   next[0], next[1],   next[0], next[1],
-
-                        curr[0], curr[1],   curr[0], curr[1],   curr[0], curr[1], // Corner
-                        curr[0], curr[1],   curr[0], curr[1],   curr[0], curr[1],
-                    ], offset);
-                    outline_normals.set([
-                        to_next[1], -to_next[0],   -to_next[1], to_next[0],   to_next[1], -to_next[0],
-                        -to_next[1], to_next[0],   -to_next[1], to_next[0],   to_next[1], -to_next[0],
-
-                        -from_last[1], from_last[0], from_last[1], -from_last[0], -to_next[1], to_next[0],
-                        -from_last[1], from_last[0], from_last[1], -from_last[0], to_next[1], -to_next[0],
-                    ], offset)
-                }
-                outline_count += part.length;
-            }
-        }
-        return {
-            polygons, vertices, triangles, outline_triangles, outline_normals,
-            min: polygons.map(p => p.min).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]),
-            max: polygons.map(p => p.max).reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]),
-        };
-    }
-
     buildRenderData() {
-        this.locations.forEach(loc => {
-            loc.color = loc.color.map(el => el / 255);
-            if (loc) {
-                if (!this.location_data[loc.id]) {
-                    this.location_data[loc.id] = this.generateTriangles(loc);
-                }
+        if (!this.triangulated) {
+            this.triangulated = TriangulatedData.new();
+            for (const loc of this.locations) {
+                this.triangulated.add_location(loc.raw);
             }
-        });
-        this.state.min = this.locations.map(l => this.location_data[l.id].min)
-            .reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1])]);
-        this.state.max = this.locations.map(l => this.location_data[l.id].max)
-            .reduce((a, b) => [Math.max(a[0], b[0]), Math.max(a[1], b[1])]);
+            this.triangulated.triangulate(this.renderer.project());
+            this.triangulated.generate_outlines(this.renderer.project());
+            this.state.min = this.triangulated.min;
+            this.state.max = this.triangulated.max;
+        }
     }
 
     render() {

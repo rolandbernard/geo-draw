@@ -4,6 +4,9 @@ node_modules/
 /static/demo/
 /dist/
 /data/
+/target/
+/pkg/
+tmp.*
 
 .vscode/
 yarn-error.log

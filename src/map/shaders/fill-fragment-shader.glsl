@@ -2,9 +2,10 @@
 #ifdef GL_ES
     precision highp float;
 #endif
-    
-uniform vec3 uFillColor;
+
+varying vec3 vPixelColor;
 
 void main() {
-    gl_FragColor = vec4(uFillColor, 1.0);
+    gl_FragColor = vec4(vPixelColor, 1.0);
 }
+

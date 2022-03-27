@@ -4,17 +4,9 @@ import FillVertexShader from './shaders/fill-vertex-shader.glsl';
 import StrokeFragmentShader from './shaders/stroke-fragment-shader.glsl';
 import StrokeVertexShader from './shaders/stroke-vertex-shader.glsl';
 
-import MapRenderer from './map-renderer';
-
 export default class WebGLRenderer {
-    projection(array) {
-        return MapRenderer.project(array);
-    }
-
-    applyProjection(array) {
-        for (let i = 0; i < array.length; i += 2) {
-            [array[i], array[i + 1]] = this.projection([array[i], array[i + 1]]);
-        }
+    project() {
+        return true;
     }
 
     clientPosToMapPos(client_pos, map_pos, state) {
@@ -66,8 +58,8 @@ export default class WebGLRenderer {
                 -2 * (size[0] / size[1]) / width * zoom_scale,
             ];
             const stroke_scale = [
-                1,
-                -size[0] / size[1],
+                Math.cbrt(zoom_scale) * 1,
+                Math.cbrt(zoom_scale) * -size[0] / size[1],
             ];
             return [translate, scale, stroke_scale];
         } else {
@@ -80,8 +72,8 @@ export default class WebGLRenderer {
                 -2 /  height * zoom_scale,
             ];
             const stroke_scale = [
-                size[1] / size[0],
-                -1,
+                Math.cbrt(zoom_scale) * size[1] / size[0],
+                Math.cbrt(zoom_scale) * -1,
             ];
             return [translate, scale, stroke_scale];
         }
@@ -101,12 +93,15 @@ export default class WebGLRenderer {
         return shader_program;
     }
 
-    initForContext(canvas, gl, locations, location_data) {
+    initForContext(canvas, gl, locations, triangulated) {
+        gl.getExtension("OES_element_index_uint");
+
         const fill_shader_program = this.createShaderProgram(gl, FillVertexShader, FillFragmentShader);
         const fill_position_attribute = gl.getAttribLocation(fill_shader_program, 'aVertexPosition');
+        const fill_color_attribute = gl.getAttribLocation(fill_shader_program, 'aVertexColor');
         const fill_translate_uniform = gl.getUniformLocation(fill_shader_program, 'uTranslate');
         const fill_scale_uniform = gl.getUniformLocation(fill_shader_program, 'uScale');
-        const fill_color_uniform = gl.getUniformLocation(fill_shader_program, 'uFillColor');
+        const fill_colors_uniform = gl.getUniformLocation(fill_shader_program, 'uColors');
 
         const stroke_shader_program = this.createShaderProgram(gl, StrokeVertexShader, StrokeFragmentShader);
         const stroke_position_attribute = gl.getAttribLocation(stroke_shader_program, 'aVertexPosition');
@@ -117,25 +112,28 @@ export default class WebGLRenderer {
         const stroke_width_uniform = gl.getUniformLocation(stroke_shader_program, 'uWidth');
         const stroke_color_uniform = gl.getUniformLocation(stroke_shader_program, 'uStrokeColor');
 
-        for(const location of locations) {
-            const triangles = location_data[location.id];
-            const position_buffer = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, position_buffer);
-            gl.bufferData(gl.ARRAY_BUFFER, triangles.vertices, gl.STATIC_DRAW);
-            const index_buffer = gl.createBuffer();
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
-            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, triangles.triangles, gl.STATIC_DRAW);
-            const outline_position_buffer = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, outline_position_buffer);
-            gl.bufferData(gl.ARRAY_BUFFER, triangles.outline_triangles, gl.STATIC_DRAW);
-            const outline_normal_buffer = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, outline_normal_buffer);
-            gl.bufferData(gl.ARRAY_BUFFER, triangles.outline_normals, gl.STATIC_DRAW);
-            triangles.gl_position_buffer = position_buffer;
-            triangles.gl_index_buffer = index_buffer;
-            triangles.gl_outline_position_buffer = outline_position_buffer;
-            triangles.gl_outline_normal_buffer = outline_normal_buffer;
-        }
+        const texture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+        const position_buffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, position_buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, triangulated.vertex, gl.STATIC_DRAW);
+        const color_buffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, color_buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, triangulated.color, gl.STATIC_DRAW);
+        const index_buffer = gl.createBuffer();
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, triangulated.triangles, gl.STATIC_DRAW);
+        const outline_position_buffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, outline_position_buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, triangulated.outline_triangles, gl.STATIC_DRAW);
+        const outline_normal_buffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, outline_normal_buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, triangulated.outline_normals, gl.STATIC_DRAW);
 
         this.webgl_data = {
             canvas: canvas,
@@ -143,9 +141,10 @@ export default class WebGLRenderer {
             fill_data: {
                 shader_program: fill_shader_program,
                 position_attribute: fill_position_attribute,
+                color_attribute: fill_color_attribute,
                 translate_uniform: fill_translate_uniform,
                 scale_uniform: fill_scale_uniform,
-                color_uniform: fill_color_uniform,
+                colors_uniform: fill_colors_uniform,
             },
             stroke_data: {
                 shader_program: stroke_shader_program,
@@ -157,19 +156,22 @@ export default class WebGLRenderer {
                 width_uniform: stroke_width_uniform,
                 color_uniform: stroke_color_uniform,
             },
+            triangles: {
+                position_buffer, color_buffer, index_buffer, texture,
+                outline_position_buffer, outline_normal_buffer,
+            }
         };
     }
 
-    deinitResources(locations, location_data) {
+    deinitResources(_locations, _triangulated) {
         if (this.webgl_data?.context) {
             const gl = this.webgl_data.context;
-            for (const location of locations) {
-                const triangles = location_data[location.id];
-                gl.deleteBuffer(triangles.gl_position_buffer);
-                gl.deleteBuffer(triangles.gl_index_buffer);
-                gl.deleteBuffer(triangles.gl_outline_position_buffer);
-                gl.deleteBuffer(triangles.gl_outline_normal_buffer);
-            }
+            gl.deleteTexture(this.webgl_data.triangles.texture);
+            gl.deleteBuffer(this.webgl_data.triangles.position_buffer);
+            gl.deleteBuffer(this.webgl_data.triangles.color_buffer);
+            gl.deleteBuffer(this.webgl_data.triangles.index_buffer);
+            gl.deleteBuffer(this.webgl_data.triangles.outline_position_buffer);
+            gl.deleteBuffer(this.webgl_data.triangles.outline_normal_buffer);
             gl.getAttachedShaders(this.webgl_data.fill_data.shader_program).forEach(s => {
                 gl.deleteShader(s);
             });
@@ -181,53 +183,65 @@ export default class WebGLRenderer {
         }
     }
 
-    renderMapInContext(locations, location_data, state) {
+    renderMapInContext(locations, triangulated, state) {
         const gl = this.webgl_data.context;
         const fill_data = this.webgl_data.fill_data;
         const stroke_data = this.webgl_data.stroke_data;
+        const triangles = this.webgl_data.triangles;
 
         const [translate, scale, stroke_scale] = this.generateTranslateAndScale(state);
 
         gl.clearColor(0.0, 0.0, 0.0, 0.0);
         gl.clear(gl.COLOR_BUFFER_BIT);
 
+        // Generate location colors
+        const colors = new Uint8Array(locations.length * 4);
         for (let i = 0; i < locations.length; i++) {
-            const loc = locations[i];
-            const triangles = location_data[loc.id];
-            // Draw stroke
-            gl.useProgram(stroke_data.shader_program);
-            gl.uniform2fv(stroke_data.translate_uniform, translate);
-            gl.uniform2fv(stroke_data.scale_uniform, scale);
-            gl.uniform2fv(stroke_data.scale2_uniform, stroke_scale);
-            gl.uniform1f(stroke_data.width_uniform, 0.005);
-            gl.uniform3fv(stroke_data.color_uniform, [0.271, 0.302, 0.38]);
-            
-            gl.bindBuffer(gl.ARRAY_BUFFER, triangles.gl_outline_normal_buffer);
-            gl.vertexAttribPointer(stroke_data.normal_attribute, 2, gl.FLOAT, false, 0, 0);
-            gl.enableVertexAttribArray(stroke_data.normal_attribute);
-
-            gl.bindBuffer(gl.ARRAY_BUFFER, triangles.gl_outline_position_buffer);
-            gl.vertexAttribPointer(stroke_data.position_attribute, 2, gl.FLOAT, false, 0, 0);
-            gl.enableVertexAttribArray(stroke_data.position_attribute);
-
-            gl.drawArrays(gl.TRIANGLES, 0, triangles.outline_triangles.length / 2);
-
-            // Draw fill
-            gl.useProgram(fill_data.shader_program);
-            gl.uniform2fv(fill_data.translate_uniform, translate);
-            gl.uniform2fv(fill_data.scale_uniform, scale);
-            if (loc.id === state.hover) {
-                gl.uniform3fv(fill_data.color_uniform, loc.color.map(el => el * 0.8));
-            } else {
-                gl.uniform3fv(fill_data.color_uniform, loc.color);
+            for (let j = 0; j < 3; j++) {
+                colors[4*i + j] = locations[i].color[j];
+                if (locations[i].id === state.hover) {
+                    colors[4*i + j] *= 0.8;
+                }
             }
-            gl.bindBuffer(gl.ARRAY_BUFFER, triangles.gl_position_buffer);
-            gl.vertexAttribPointer(fill_data.position_attribute, 2, gl.FLOAT, false, 0, 0);
-            gl.enableVertexAttribArray(fill_data.position_attribute);
-
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, triangles.gl_index_buffer);
-            gl.drawElements(gl.TRIANGLES, triangles.triangles.length, gl.UNSIGNED_SHORT, 0);
+            colors[4*i + 3] = 255;
         }
+        gl.bindTexture(gl.TEXTURE_2D, triangles.texture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, locations.length, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, colors);
+
+        // Draw fill
+        gl.useProgram(fill_data.shader_program);
+        gl.uniform2fv(fill_data.translate_uniform, translate);
+        gl.uniform2fv(fill_data.scale_uniform, scale);
+        gl.uniform1i(fill_data.colors_uniform, 0);
+        
+        gl.bindBuffer(gl.ARRAY_BUFFER, triangles.position_buffer);
+        gl.vertexAttribPointer(fill_data.position_attribute, 2, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(fill_data.position_attribute);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, triangles.color_buffer);
+        gl.vertexAttribPointer(fill_data.color_attribute, 1, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(fill_data.color_attribute);
+
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, triangles.index_buffer);
+        gl.drawElements(gl.TRIANGLES, triangulated.triangles.length, gl.UNSIGNED_INT, 0);
+
+        // Draw stroke
+        gl.useProgram(stroke_data.shader_program);
+        gl.uniform2fv(stroke_data.translate_uniform, translate);
+        gl.uniform2fv(stroke_data.scale_uniform, scale);
+        gl.uniform2fv(stroke_data.scale2_uniform, stroke_scale);
+        gl.uniform1f(stroke_data.width_uniform, 0.0025);
+        gl.uniform3fv(stroke_data.color_uniform, [0.271, 0.302, 0.38]);
+        
+        gl.bindBuffer(gl.ARRAY_BUFFER, triangles.outline_normal_buffer);
+        gl.vertexAttribPointer(stroke_data.normal_attribute, 2, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(stroke_data.normal_attribute);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, triangles.outline_position_buffer);
+        gl.vertexAttribPointer(stroke_data.position_attribute, 2, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(stroke_data.position_attribute);
+
+        gl.drawArrays(gl.TRIANGLES, 0, triangulated.outline_triangles.length / 2);
     }
 }
 

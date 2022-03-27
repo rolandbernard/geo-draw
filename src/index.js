@@ -5,7 +5,7 @@ import 'typeface-roboto';
 import { Router } from './router';
 import './index.css';
 
-if ('serviceWorker' in navigator) {
+if (isProduction && 'serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('./service-worker.js');
     });

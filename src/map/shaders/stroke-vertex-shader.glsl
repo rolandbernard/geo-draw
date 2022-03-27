@@ -9,6 +9,9 @@ uniform float uWidth;
 
 void main() {
     gl_Position = vec4(
-        (aVertexPosition + uTranslate) * uScale + normalize(aVertexNormal) * uWidth * uStrokeScale,
-        0.0, 1.0);
+        (aVertexPosition + uTranslate) * uScale
+        + normalize(aVertexNormal) * uWidth * uStrokeScale,
+        0.0, 1.0
+    );
 }
+
