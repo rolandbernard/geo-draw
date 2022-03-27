@@ -1,18 +1,18 @@
 
 #[derive(Clone)]
 struct Node {
-    i: usize, x: f32, y: f32, hole: bool,
+    i: usize, x: f32, y: f32,
     next: usize, prev: usize,
     z: u32, znext: usize, zprev: usize,
 }
 
 impl Node {
-    fn new(i: usize, x: f32, y: f32, hole: bool, next: usize, prev: usize) -> Node {
-        Node { i, x, y, hole, next, prev, z: 0, znext: 0, zprev: 0 }
+    fn new(i: usize, x: f32, y: f32, next: usize, prev: usize) -> Node {
+        Node { i, x, y, next, prev, z: 0, znext: 0, zprev: 0 }
     }
 
     fn dummy(x: f32, y: f32) -> Node {
-        Self::new(0, x, y, false, 0, 0)
+        Self::new(0, x, y, 0, 0)
     }
 }
 
@@ -28,7 +28,7 @@ pub fn triangulate_into(triangles: &mut Vec<u32>, vertex: &[f32], holes: &[u32],
     let mut nodes = Vec::with_capacity(node_len + 2 * holes.len());
     for i in 0..node_len {
         nodes.push(Node::new(
-            i, vertex[2*i], vertex[2*i + 1], i >= outer_len,
+            i, vertex[2*i], vertex[2*i + 1],
             (i + 1) % node_len, (node_len + i - 1) % node_len
         ));
     }
@@ -234,9 +234,14 @@ fn resolve_intersections(nodes: &mut [Node], head: usize, triangles: &mut Vec<u3
     let mut cur = head;
     while nodes[cur].prev != nodes[cur].next {
         let prev = nodes[cur].prev;
+        let prev2 = nodes[prev].prev;
         let next = nodes[cur].next;
         let next2 = nodes[next].next;
-        if prev != next2 && lines_intersect(&nodes[prev], &nodes[cur], &nodes[next], &nodes[next2]) {
+        let next3 = nodes[next2].next;
+        if prev != next2 && lines_intersect(&nodes[prev], &nodes[cur], &nodes[next], &nodes[next2])
+            && locally_inside(&nodes[prev2], &nodes[prev], &nodes[cur], &nodes[next2])
+            && locally_inside(&nodes[next], &nodes[next2], &nodes[next3], &nodes[prev])
+        {
             triangles.push(nodes[prev].i as u32);
             triangles.push(nodes[cur].i as u32);
             triangles.push(nodes[next2].i as u32);
@@ -277,14 +282,40 @@ fn locally_inside(a0: &Node, a: &Node, a1: &Node, b: &Node) -> bool {
     }
 }
 
+fn middle_inside(nodes: &[Node], a: usize, b: usize) -> bool {
+    let mut cur = a;
+    let mut inside = false;
+    let middle = [(nodes[a].x + nodes[b].x) / 2.0, (nodes[a].y + nodes[b].y) / 2.0];
+    loop {
+        let next = nodes[cur].next;
+        if (nodes[cur].y > middle[1]) != (nodes[next].y > middle[1])
+            && nodes[next].y != nodes[cur].y
+            && middle[0] < (nodes[next].x - nodes[cur].x) * (middle[1] - nodes[cur].y) / (nodes[next].y - nodes[cur].y) + nodes[cur].x
+        {
+            inside = !inside;
+        }
+        cur = next;
+        if cur == a {
+            break;
+        }
+    }
+    return inside;
+}
+
 fn is_possible_diagonal(nodes: &[Node], poly: usize, a: usize, b: usize) -> bool {
     let a_next = nodes[a].next;
     let a_prev = nodes[a].prev;
     let b_next = nodes[b].next;
     let b_prev = nodes[b].prev;
-    nodes[a].i != nodes[b].i && nodes[a_next].i != nodes[b].i && nodes[a_prev].i != nodes[b].i
-        && locally_inside(&nodes[a_prev], &nodes[a], &nodes[a_next], &nodes[b])
-        && locally_inside(&nodes[b_prev], &nodes[b], &nodes[b_next], &nodes[a])
+    nodes[a_next].i != nodes[b].i && nodes[a_prev].i != nodes[b].i
+        && ((locally_inside(&nodes[a_prev], &nodes[a], &nodes[a_next], &nodes[b])
+                && locally_inside(&nodes[b_prev], &nodes[b], &nodes[b_next], &nodes[a])
+                && middle_inside(nodes, a, b) && (
+                    tri_area(&nodes[a_prev], &nodes[a], &nodes[b_prev]) != 0.0
+                    || tri_area(&nodes[a], &nodes[b_prev], &nodes[b]) != 0.0
+                ))
+            || (nodes[a] == nodes[b] && tri_area(&nodes[a_prev], &nodes[a], &nodes[a_next]) > 0.0
+                && tri_area(&nodes[b_prev], &nodes[b], &nodes[b_next]) > 0.0))
         && !line_intersect_poly(nodes, poly, &nodes[a], &nodes[b])
 }
 
@@ -322,22 +353,21 @@ fn apply_earcut(nodes: &mut Vec<Node>, head: usize, triangles: &mut Vec<u32>, mi
     let mut pass = 0;
     let mut cur = head;
     while nodes[cur].prev != nodes[cur].next && pass < 3 {
-        if pass < 2 {
+        if pass == 1 {
             cur = filter_points(nodes, cur);
-        } else {
+        } else if pass == 2 {
             cur = filter_points(nodes, cur);
             cur = resolve_intersections(nodes, cur, triangles);
             cur = filter_points(nodes, cur);
         }
         let mut stop = cur;
-        let mut fallback = false;
         while nodes[cur].prev != nodes[cur].next {
             let prev = nodes[cur].prev;
             let next = nodes[cur].next;
             let ear = if inv_size.is_nan() {
-                is_ear(nodes, cur, fallback)
+                is_ear(nodes, cur)
             } else {
-                is_ear_z_index(nodes, cur, fallback, min, inv_size)
+                is_ear_z_index(nodes, cur, min, inv_size)
             };
             if ear {
                 triangles.push(nodes[prev].i as u32);
@@ -346,15 +376,10 @@ fn apply_earcut(nodes: &mut Vec<Node>, head: usize, triangles: &mut Vec<u32>, mi
                 remove_node(nodes, cur);
                 cur = nodes[next].next;
                 stop = cur;
-                fallback = false;
             } else {
                 cur = next;
                 if cur == stop {
-                    if pass < 2 || fallback {
-                        break;
-                    } else {
-                        fallback = true;
-                    }
+                    break;
                 }
             }
         }
@@ -365,7 +390,7 @@ fn apply_earcut(nodes: &mut Vec<Node>, head: usize, triangles: &mut Vec<u32>, mi
     }
 }
 
-fn is_ear(nodes: &[Node], node: usize, fallback: bool) -> bool {
+fn is_ear(nodes: &[Node], node: usize) -> bool {
     let a = &nodes[nodes[node].prev];
     let b = &nodes[node];
     let c = &nodes[nodes[node].next];
@@ -376,10 +401,8 @@ fn is_ear(nodes: &[Node], node: usize, fallback: bool) -> bool {
     loop {
         let prev = nodes[cur].prev;
         let next = nodes[cur].next;
-        if !fallback || !nodes[cur].hole || nodes[node].hole {
-            if point_in_triangle(a, b, c, &nodes[cur]) && tri_area(&nodes[prev], &nodes[cur], &nodes[next]) >= 0.0 {
-                return false;
-            }
+        if point_in_triangle(a, b, c, &nodes[cur]) && tri_area(&nodes[prev], &nodes[cur], &nodes[next]) >= 0.0 {
+            return false;
         }
         cur = next;
         if cur == nodes[node].prev {
@@ -421,7 +444,7 @@ fn z_order(pos: [f32; 2], min: [f32; 2], inv_size: f32) -> u32 {
     return x | (y << 1);
 }
 
-fn is_ear_z_index(nodes: &[Node], node: usize, fallback: bool, min: [f32; 2], inv_size: f32) -> bool {
+fn is_ear_z_index(nodes: &[Node], node: usize, min: [f32; 2], inv_size: f32) -> bool {
     let prev = nodes[node].prev;
     let next = nodes[node].next;
     let a = &nodes[prev];
@@ -438,25 +461,21 @@ fn is_ear_z_index(nodes: &[Node], node: usize, fallback: bool, min: [f32; 2], in
     let mut n = nodes[node].znext;
     while (p != usize::MAX && nodes[p].z >= min_z) || (n != usize::MAX && nodes[n].z <= max_z) {
         if p != usize::MAX && nodes[p].z >= min_z {
-            if !fallback || !nodes[p].hole || nodes[node].hole {
-                if p != prev && p != next && point_in_triangle(a, b, c, &nodes[p]) {
-                    let pprev = nodes[p].prev;
-                    let pnext = nodes[p].next;
-                    if tri_area(&nodes[pprev], &nodes[p], &nodes[pnext]) >= 0.0 {
-                        return false;
-                    }
+            if p != prev && p != next && point_in_triangle(a, b, c, &nodes[p]) {
+                let pprev = nodes[p].prev;
+                let pnext = nodes[p].next;
+                if tri_area(&nodes[pprev], &nodes[p], &nodes[pnext]) >= 0.0 {
+                    return false;
                 }
             }
             p = nodes[p].zprev;
         }
         if n != usize::MAX && nodes[n].z <= max_z {
-            if !fallback || !nodes[n].hole || nodes[node].hole {
-                if n != prev && n != next && point_in_triangle(a, b, c, &nodes[n]) {
-                    let nprev = nodes[n].prev;
-                    let nnext = nodes[n].next;
-                    if tri_area(&nodes[nprev], &nodes[n], &nodes[nnext]) >= 0.0 {
-                        return false;
-                    }
+            if n != prev && n != next && point_in_triangle(a, b, c, &nodes[n]) {
+                let nprev = nodes[n].prev;
+                let nnext = nodes[n].next;
+                if tri_area(&nodes[nprev], &nodes[n], &nodes[nnext]) >= 0.0 {
+                    return false;
                 }
             }
             n = nodes[n].znext;
