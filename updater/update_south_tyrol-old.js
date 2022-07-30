@@ -2,10 +2,14 @@
 const fs = require('fs');
 const path = require('path');
 const fetch = require('node-fetch');
+const puppeteer = require('puppeteer');
 const xlsx = require('xlsx');
 
-const OUTPUT_DIRECTORY = '../static/demo/';
 
+const NUM_PAGES_TO_VISIT = 1;
+const NEW_PAGE_DELAY = 500;
+const OUTPUT_DIRECTORY = '../static/demo/';
+const SEARCHED_LINKS = './data/south-tyrol/exisiting.json';
 // Only locations in this set will be exported
 const locations_to_include = {
     21006: {"id": "-47255", "einwohner": 3471},
@@ -384,29 +388,63 @@ async function readDataFromLink(xlsx_link) {
     return { data: output, date: date };
 }
 
-async function getDownloadLinks() {
-    let cur_date = new Date();
-    cur_date.setHours(cur_date.getHours() + 2);
-    let start_date = new Date();
-    try {
-        const last_raw = fs.readFileSync(path.join(__dirname, './data/south-tyrol/last.json'));
-        start_date = new Date(JSON.parse(last_raw).date);
-        start_date.setDate(start_date.getDate() + 1);
-    } catch(e) {}
-    const links = [];
-    while (start_date < new Date()) {
-        const formatted = start_date.toISOString().substring(0, 10).replaceAll('-', '');
-        links.push(`https://afbs.provinz.bz.it/upload/coronavirus/pm/CoronaVirusPositivi_${formatted}.xlsx`);
-        start_date.setDate(start_date.getDate() + 1);
-    }
-    return links;
+async function getDownloadLinks(to_avoid) {
+    const visited_links = new Set();
+    const browser = await puppeteer.launch({
+        executablePath: '/usr/bin/chromium'
+    });
+    // Use the code below only for debuging
+    // const browser = await puppeteer.connect({
+    //     browserWSEndpoint: 'ws://127.0.0.1:9222/devtools/browser/472b7d09-023c-4dfd-b465-46e1b3a54d55',
+    //     defaultViewport: {width: 1500, height: 1000}
+    // });
+    const page = await browser.newPage();
+    // Get the link for every page
+    const page_links = [...Array(NUM_PAGES_TO_VISIT).keys()].map(pag => `https://sabes.it/de/news.asp?aktuelles_page=${pag + 1}`);
+    // Visit all pages and return the links of all the artikles
+    const artikle_links = (await page_links.reduce((pr, page_link) => {
+        return pr.then(async (v) => {
+            await page.goto(page_link, { waitUntil: 'domcontentloaded' });
+            await page.waitForTimeout(NEW_PAGE_DELAY);
+            const artikle_links = await page.$$eval('.news .box h3 a', (elements) => {
+                return elements.filter(el => el.innerText.match(/coronavirus/i)).map(el => el.href);
+            });
+            return [...v, ...artikle_links];
+        });
+    }, new Promise(res => res([])))).filter(link => !to_avoid.has(link));
+    // Visit all artikles and return the download links
+    const xlsx_links = (await artikle_links.reduce((promis, artikle_link) => {
+        return promis.then(async (v) => {
+            await page.goto(artikle_link, { waitUntil: 'domcontentloaded' });
+            await page.waitForTimeout(NEW_PAGE_DELAY);
+            const download_links = await page.$$eval('.downloads ol li a', (elements) => {
+                return elements.filter(el => el.innerText.match(/positiv/i)).map(el => el.href);
+            });
+            // If the download link is already pressent
+            if(download_links.length > 0) {
+                visited_links.add(artikle_link);
+                download_links.forEach(link => visited_links.add(link));
+                return [...v, ...download_links];
+            } else {
+                return v;
+            }
+        })
+    }, new Promise(res => res([])))).filter(link => !to_avoid.has(link));
+    await browser.close();
+    return { xlsx_links: xlsx_links, visited_links: visited_links };
 }
 
 (async () => {
+    // Load the list of links that were already searched and should be skiped
+    let existing = new Set();
+    try {
+        const existing_raw = fs.readFileSync(path.join(__dirname, SEARCHED_LINKS));
+        existing = new Set(JSON.parse(existing_raw));
+    } catch(e) {}
     // Get all new links
-    const xlsx_links = await getDownloadLinks();
+    const { xlsx_links, visited_links } = await getDownloadLinks(existing);
     if(xlsx_links.length === 0) {
-        console.error('No new data links');
+        console.error('Failed to load data');
         process.exit(1);
     }
     let newest_date = null;
@@ -420,11 +458,10 @@ async function getDownloadLinks() {
             }
             fs.writeFileSync(path.join(__dirname, OUTPUT_DIRECTORY, `covid-south-tyrol-${formatDate(date)}.json`), JSON.stringify(data));
             fs.writeFileSync(path.join(__dirname, OUTPUT_DIRECTORY, `covid-south-tyrol-newest.json`), JSON.stringify(newest_data));
+            existing.add(link);
+            fs.writeFileSync(path.join(__dirname, SEARCHED_LINKS), JSON.stringify([...existing]));
         })
     }, new Promise(res => res()));
-    fs.writeFileSync(
-        path.join(__dirname, './data/south-tyrol/last.json'),
-        JSON.stringify({ date: (new Date()).toISOString() })
-    );
+    fs.writeFileSync(path.join(__dirname, SEARCHED_LINKS), JSON.stringify([...new Set([...existing, ...visited_links])]));
 })();
 
