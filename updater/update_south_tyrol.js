@@ -406,7 +406,6 @@ async function getDownloadLinks() {
     // Get all new links
     const xlsx_links = await getDownloadLinks();
     if(xlsx_links.length === 0) {
-        console.error('No new data links');
         process.exit(1);
     }
     let newest_date = null;
