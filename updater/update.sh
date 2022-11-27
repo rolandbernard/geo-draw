@@ -3,7 +3,8 @@ dir_name=$(dirname $0)
 
 echo "===== GIT PULL =================================="
 
-git pull
+cd ${dir_name}/.. && \
+    git pull
 
 echo "===== SOUTH TYROL ==============================="
 
