@@ -1,5 +1,5 @@
 
-dir_name=$(dirname $0)
+dir_name=$(dirname $(realpath $0))
 
 echo "===== GIT PULL =================================="
 
