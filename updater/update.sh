@@ -54,7 +54,7 @@ if [ $new ]
 then
     echo "===== PUBLISH =================================="
     cd ${dir_name}/.. && \
-        yarn install  && \
-        yarn ghpages
+        npx yarn install  && \
+        npx yarn ghpages
 fi
 
