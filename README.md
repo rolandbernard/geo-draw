@@ -8,9 +8,9 @@ This is only a small project I started, to learn lit-html/LitElement, WebGl and 
 the Rust programming language a bit more.
 
 A example of what is possible can be found here:
-* https://rolandbernard.github.io/geo-draw/#/demo/covid-south-tyrol-newest
-* https://rolandbernard.github.io/geo-draw/#/demo/covid-italy-newest
-* https://rolandbernard.github.io/geo-draw/#/demo/covid-world-newest
+* https://geodraw.rolandb.com/#/demo/covid-south-tyrol-newest
+* https://geodraw.rolandb.com/#/demo/covid-italy-newest
+* https://geodraw.rolandb.com/#/demo/covid-world-newest
 
 ## Setup
 If you run the application yourself you will have to clone the repository, download
